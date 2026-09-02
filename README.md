@@ -30,3 +30,18 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 Требуется тот же `.env`, что и для dev (пароль БД, Django secret key, S3), плюс реальные TLS-сертификаты, смонтированные в nginx-контейнер (путь задан в `docker-compose.prod.yml`).
+
+### Автодеплой
+
+`./deploy.sh` — идемпотентный скрипт для сервера: подтягивает код из GitHub (`git fetch` + `reset --hard origin/main`), пересобирает и поднимает `docker-compose.prod.yml`, создаёт БД `django_db`/`logto_db`, если их ещё нет, гоняет миграции Django, засеивает Logto только если его БД реально пустая (не задваивает сид при повторных запусках).
+
+Первый раз на сервере:
+
+```
+git clone git@github.com:Loruxon/financial-systems.git
+cd financial-systems
+cp .env.example .env   # заполнить реальными значениями
+./deploy.sh
+```
+
+Дальше для обновления — просто `./deploy.sh` снова.
