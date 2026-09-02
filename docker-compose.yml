@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    user: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  logto:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    image: svhd/logto:1.39.0
+    #entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm start"]
+    ports:
+      - 3001:3001
+      - 3002:3002
+    environment:
+      - TRUST_PROXY_HEADER=1
+      - DB_URL=postgres://postgres:${DB_PASSWORD}@postgres:5432/logto_db
+      - PRIVATE_KEY_ROTATION_GRACE_PERIOD
+      - ENDPOINT=https://auth.board.fbridge.pro
+      - ADMIN_ENDPOINT=https://admin.board.fbridge.pro
+      - NODE_EXTRA_CA_CERTS=/certs/rootCA.pem
+    extra_hosts:
+      - "auth.board.fbridge.pro:host-gateway"
+      - "admin.board.fbridge.pro:host-gateway"
+    volumes:
+      - /home/son/.local/share/mkcert/rootCA.pem:/certs/rootCA.pem:ro
+    networks:
+      - app-network
+
+  django:
+    build:
+      context: ./django
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./django:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DB_NAME=django_db
+      - DB_USER=postgres
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  react:
+    build:
+      context: ./react
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./react:/app
+      - /app/node_modules
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - /home/son/certs:/etc/nginx/certs:ro
+    depends_on:
+      - react
+      - django
+      - logto
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pgdata:

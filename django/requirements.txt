@@ -1,0 +1,7 @@
+Django
+djangorestframework
+psycopg2-binary
+gunicorn
+PyJWT[crypto]
+django-cors-headers
+django-storages[s3]

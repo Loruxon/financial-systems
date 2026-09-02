@@ -1,0 +1,34 @@
+# Node
+node_modules/
+dist/
+.vite/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# Django
+*.sqlite3
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Old copies
+order/
+
+# Editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+.~lock.*#
+
+# Local agent/tooling config
+.mcp.json

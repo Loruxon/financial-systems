@@ -1,0 +1,186 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #F2F1EC;
+  --foreground: #18181B;
+  --card: #FFFFFF;
+  --card-foreground: #18181B;
+  --popover: #FFFFFF;
+  --popover-foreground: #18181B;
+  --primary: #27272A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F4F4F5;
+  --secondary-foreground: #27272A;
+  --muted: #F4F4F5;
+  /* Контраст к --background (#F2F1EC) и --card (белый) — минимум 4.5:1
+     (WCAG AA). Прежнее значение #71717A давало только 4.27:1 к фону —
+     плейсхолдеры/подписи визуально сливались со страницей. */
+  --muted-foreground: #6B6B74;
+  /* Второй, более тёмный уровень приглушённости — для того, что пользователь
+     ДОЛЖЕН прочитать (лейблы полей, заголовки колонок), но это не основной
+     текст. Контраст ~6.3:1 к фону / ~7.2:1 к карточкам. */
+  --foreground-secondary: #57575F;
+  --accent: #F4F4F5;
+  --accent-foreground: #27272A;
+  --destructive: #B91C1C;
+  --destructive-foreground: #FFFFFF;
+  --success: #15803D;
+  --success-foreground: #FFFFFF;
+  --warning: #D97706;
+  --warning-foreground: #FFFFFF;
+  --border: #DCDBD5;
+  --input: #DCDBD5;
+  /* Отдельный (более светлый) графит для focus-ring — тёмный --primary в
+     фокус-кольце на 20% непрозрачности плохо считывается на светлом фоне. */
+  --ring: #52525B;
+  --chart-1: #4338CA;
+  --chart-2: oklch(0.6500 0.1500 185);
+  --chart-3: oklch(0.7500 0.1400 80);
+  --chart-4: oklch(0.6200 0.1800 320);
+  --chart-5: oklch(0.5500 0.1700 140);
+  /* Сайдбар — константа, не зависит от light/dark темы контента (см. .dark ниже, где sidebar-* не переопределяются) */
+  --sidebar: oklch(0.2100 0.0100 265);
+  --sidebar-foreground: oklch(0.9200 0.0040 260);
+  --sidebar-primary: oklch(1 0 0 / 14%);
+  --sidebar-primary-foreground: oklch(0.9800 0 0);
+  --sidebar-accent: oklch(1 0 0 / 10%);
+  --sidebar-accent-foreground: oklch(0.9800 0 0);
+  --sidebar-idle: oklch(1 0 0 / 2.5%);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.5400 0.1900 274);
+  --radius: 0.5rem;
+  --shadow-2xs: 0 1px 2px 0px hsl(240 6% 10% / 0.03);
+  --shadow-xs: 0 1px 2px 0px hsl(240 6% 10% / 0.04);
+  --shadow-sm: 0 1px 2px 0px hsl(240 6% 10% / 0.05), 0 1px 1px -1px hsl(240 6% 10% / 0.04);
+  --shadow: 0 1px 3px 0px hsl(240 6% 10% / 0.06), 0 1px 2px -1px hsl(240 6% 10% / 0.04);
+  --shadow-md: 0 2px 4px 0px hsl(240 6% 10% / 0.06), 0 1px 2px -1px hsl(240 6% 10% / 0.04);
+  --shadow-lg: 0 4px 8px 0px hsl(240 6% 10% / 0.07), 0 2px 4px -1px hsl(240 6% 10% / 0.05);
+  --shadow-xl: 0 8px 16px 0px hsl(240 6% 10% / 0.08), 0 4px 6px -1px hsl(240 6% 10% / 0.05);
+  --shadow-2xl: 0 12px 24px 0px hsl(240 6% 10% / 0.10);
+}
+
+.dark {
+  --background: oklch(0.1600 0.0080 265);
+  --foreground: oklch(0.9200 0.0040 260);
+  --card: oklch(0.2100 0.0100 265);
+  --card-foreground: oklch(0.9200 0.0040 260);
+  --popover: oklch(0.2100 0.0100 265);
+  --popover-foreground: oklch(0.9200 0.0040 260);
+  /* Монохромный акцент: primary = тот же тон, что foreground (светлый графит
+     на тёмном фоне), primary-foreground = тон фона, для контраста на кнопках. */
+  --primary: oklch(0.9200 0.0040 260);
+  --primary-foreground: oklch(0.1600 0.0080 265);
+  --secondary: oklch(0.2600 0.0100 265);
+  --secondary-foreground: oklch(0.8500 0.0040 260);
+  --muted: oklch(0.2600 0.0100 265);
+  /* Тот же принцип, что и в светлой теме: контраст к --background и --card
+     минимум 4.5:1. Прежнее значение (0.58) давало только 4.14:1 к --card. */
+  --muted-foreground: oklch(0.6200 0.0080 260);
+  /* Второй, более светлый уровень — для лейблов/заголовков колонок. */
+  --foreground-secondary: oklch(0.7600 0.0040 260);
+  --accent: oklch(0.2600 0.0100 265);
+  --accent-foreground: oklch(0.8500 0.0040 260);
+  --destructive: oklch(0.5800 0.1900 25);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --success: oklch(0.5200 0.1500 145);
+  --success-foreground: oklch(1.0000 0 0);
+  --warning: oklch(0.6400 0.1600 65);
+  --warning-foreground: oklch(1.0000 0 0);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.9200 0.0040 260);
+  --chart-1: oklch(0.5400 0.1900 274);
+  --chart-2: oklch(0.6500 0.1500 185);
+  --chart-3: oklch(0.7500 0.1400 80);
+  --chart-4: oklch(0.6200 0.1800 320);
+  --chart-5: oklch(0.5500 0.1700 140);
+  /* sidebar-* намеренно не переопределяются здесь — сайдбар всегда тёмный, см. :root */
+  --radius: 0.5rem;
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.10);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.12);
+  --shadow-sm: 0 1px 2px 0px hsl(0 0% 0% / 0.16), 0 1px 2px -1px hsl(0 0% 0% / 0.12);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.16), 0 1px 2px -1px hsl(0 0% 0% / 0.12);
+  --shadow-md: 0 2px 4px 0px hsl(0 0% 0% / 0.18), 0 1px 2px -1px hsl(0 0% 0% / 0.12);
+  --shadow-lg: 0 4px 8px 0px hsl(0 0% 0% / 0.20), 0 2px 4px -1px hsl(0 0% 0% / 0.14);
+  --shadow-xl: 0 8px 16px 0px hsl(0 0% 0% / 0.22), 0 4px 6px -1px hsl(0 0% 0% / 0.14);
+  --shadow-2xl: 0 12px 24px 0px hsl(0 0% 0% / 0.32);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-foreground-secondary: var(--foreground-secondary);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-idle: var(--sidebar-idle);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-serif: var(--font-serif);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  html {
+    @apply font-sans;
+  }
+}
