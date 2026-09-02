@@ -24,6 +24,7 @@ import AdminOutgoingPaymentDetailPage from './pages/admin/outgoing-payments/deta
 import CallbackPage from './pages/callback'
 import { initAuth, api } from './lib/api'
 import { AuthContext, useAuth } from './lib/auth-context'
+import { adminNav } from './components/app-sidebar'
 
 const logtoConfig: LogtoConfig = {
   endpoint: 'https://auth.board.fbridge.pro/',
@@ -39,6 +40,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const [userName, setUserName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [percentClient, setPercentClient] = useState<string | null>(null)
+  const [adminSections, setAdminSections] = useState<string[]>([])
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -60,6 +62,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
           const me = await api.getMe()
           setIsAdmin(me.auth.is_admin)
           setPercentClient(me.organization?.percent_client ?? null)
+          setAdminSections(me.admin_sections)
         } catch {
           setIsAdmin(false)
         }
@@ -73,27 +76,38 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (!tokenReady) return <div className="flex min-h-screen items-center justify-center"><Spinner className="size-6 text-muted-foreground" /></div>
   return (
-    <AuthContext.Provider value={{ isAdmin, userName, userEmail, percentClient }}>
+    <AuthContext.Provider value={{ isAdmin, userName, userEmail, percentClient, adminSections }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
-function AdminGuard({ children }: { children: React.ReactNode }) {
-  const { isAdmin } = useAuth()
+function firstAvailableAdminUrl(adminSections: string[]) {
+  return adminNav.find((item) => adminSections.includes(item.section))?.url ?? "/request"
+}
+
+// section — опционален: если указан, доступ есть только у админов, которым
+// открыт именно этот раздел (ограниченный админ не должен пройти по прямой
+// ссылке в раздел, скрытый у него из меню). Реальная защита данных всё равно
+// на бэкенде — это только клиентский UX, чтобы не показывать пустой экран.
+function AdminGuard({ children, section }: { children: React.ReactNode; section?: string }) {
+  const { isAdmin, adminSections } = useAuth()
   if (!isAdmin) return <Navigate to="/request" replace />
+  if (section && !adminSections.includes(section)) {
+    return <Navigate to={firstAvailableAdminUrl(adminSections)} replace />
+  }
   return <>{children}</>
 }
 
 function ClientGuard({ children }: { children: React.ReactNode }) {
-  const { isAdmin } = useAuth()
-  if (isAdmin) return <Navigate to="/admin/requests" replace />
+  const { isAdmin, adminSections } = useAuth()
+  if (isAdmin) return <Navigate to={firstAvailableAdminUrl(adminSections)} replace />
   return <>{children}</>
 }
 
 function DefaultRedirect() {
-  const { isAdmin } = useAuth()
-  return <Navigate to={isAdmin ? "/admin/requests" : "/request"} replace />
+  const { isAdmin, adminSections } = useAuth()
+  return <Navigate to={isAdmin ? firstAvailableAdminUrl(adminSections) : "/request"} replace />
 }
 
 const App = () => (
@@ -111,15 +125,15 @@ const App = () => (
             <Route path="counterparty" element={<ClientGuard><CounterpartyPage /></ClientGuard>} />
             <Route path="counterparty/:id" element={<ClientGuard><CounterpartyDetailPage /></ClientGuard>} />
             <Route path="statement" element={<ClientGuard><StatementPage /></ClientGuard>} />
-            <Route path="admin/requests" element={<AdminGuard><AdminRequestsPage /></AdminGuard>} />
-            <Route path="admin/requests/:id" element={<AdminGuard><AdminRequestDetailPage /></AdminGuard>} />
-            <Route path="admin/payment-confirmations" element={<AdminGuard><AdminPaymentConfirmationsPage /></AdminGuard>} />
-            <Route path="admin/transfers" element={<AdminGuard><AdminTransfersPage /></AdminGuard>} />
-            <Route path="admin/incoming-payments" element={<AdminGuard><AdminIncomingPaymentsPage /></AdminGuard>} />
-            <Route path="admin/organization-balances" element={<AdminGuard><AdminOrganizationBalancesPage /></AdminGuard>} />
-            <Route path="admin/outgoing-payments" element={<AdminGuard><AdminOutgoingPaymentsPage /></AdminGuard>} />
-            <Route path="admin/outgoing-payments/add" element={<AdminGuard><AdminOutgoingPaymentAddPage /></AdminGuard>} />
-            <Route path="admin/outgoing-payments/:id" element={<AdminGuard><AdminOutgoingPaymentDetailPage /></AdminGuard>} />
+            <Route path="admin/requests" element={<AdminGuard section="requests"><AdminRequestsPage /></AdminGuard>} />
+            <Route path="admin/requests/:id" element={<AdminGuard section="requests"><AdminRequestDetailPage /></AdminGuard>} />
+            <Route path="admin/payment-confirmations" element={<AdminGuard section="payment_confirmations"><AdminPaymentConfirmationsPage /></AdminGuard>} />
+            <Route path="admin/transfers" element={<AdminGuard section="transfers"><AdminTransfersPage /></AdminGuard>} />
+            <Route path="admin/incoming-payments" element={<AdminGuard section="incoming_payments"><AdminIncomingPaymentsPage /></AdminGuard>} />
+            <Route path="admin/organization-balances" element={<AdminGuard section="organization_balances"><AdminOrganizationBalancesPage /></AdminGuard>} />
+            <Route path="admin/outgoing-payments" element={<AdminGuard section="outgoing_payments"><AdminOutgoingPaymentsPage /></AdminGuard>} />
+            <Route path="admin/outgoing-payments/add" element={<AdminGuard section="outgoing_payments"><AdminOutgoingPaymentAddPage /></AdminGuard>} />
+            <Route path="admin/outgoing-payments/:id" element={<AdminGuard section="outgoing_payments"><AdminOutgoingPaymentDetailPage /></AdminGuard>} />
             {/* Редиректы со старых путей — на случай сохранённых закладок */}
             <Route path="admin/statement" element={<Navigate to="/admin/payment-confirmations" replace />} />
             <Route path="admin/receipts" element={<Navigate to="/admin/incoming-payments" replace />} />

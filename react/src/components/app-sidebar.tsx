@@ -73,19 +73,22 @@ const nav = [
   { title: "Выписка",     url: "/statement",   icon: ScrollText    },
 ]
 
-const adminNav = [
-  { title: "Заявки",                    url: "/admin/requests",              icon: ShieldCheck    },
-  { title: "Подтверждение поступлений", url: "/admin/payment-confirmations", icon: ArrowLeftRight },
-  { title: "Переводы",                  url: "/admin/transfers",             icon: Repeat2        },
-  { title: "Поступления",               url: "/admin/incoming-payments",     icon: TrendingUp     },
-  { title: "Исходящие платежи",         url: "/admin/outgoing-payments",     icon: Send           },
-  { title: "Балансы организаций",       url: "/admin/organization-balances", icon: Wallet         },
+// section — ключ раздела с бэкенда (/api/me/ → admin_sections), по которому
+// решаем, показывать ли пункт меню ограниченному админу.
+export const adminNav = [
+  { title: "Заявки",                    url: "/admin/requests",              icon: ShieldCheck,    section: "requests"               },
+  { title: "Подтверждение поступлений", url: "/admin/payment-confirmations", icon: ArrowLeftRight, section: "payment_confirmations"  },
+  { title: "Переводы",                  url: "/admin/transfers",             icon: Repeat2,        section: "transfers"              },
+  { title: "Поступления",               url: "/admin/incoming-payments",     icon: TrendingUp,     section: "incoming_payments"      },
+  { title: "Исходящие платежи",         url: "/admin/outgoing-payments",     icon: Send,           section: "outgoing_payments"      },
+  { title: "Балансы организаций",       url: "/admin/organization-balances", icon: Wallet,         section: "organization_balances"  },
 ]
 
 export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { pathname } = useLocation()
   const { signOut, getIdTokenClaims } = useLogto()
-  const { isAdmin } = useAuth()
+  const { isAdmin, adminSections } = useAuth()
+  const visibleAdminNav = adminNav.filter((item) => adminSections.includes(item.section))
   const [userInfo, setUserInfo] = useState<{ name?: string; email?: string; picture?: string } | null>(null)
 
   useEffect(() => {
@@ -175,7 +178,7 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="gap-1">
-                {adminNav.map((item) => (
+                {visibleAdminNav.map((item) => (
                   <SidebarMenuItem key={item.url}>
                     <SidebarMenuButton
                       asChild

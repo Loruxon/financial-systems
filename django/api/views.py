@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from auth_middleware import AccessTokenAuthentication
 from organizations.models import Organization
+from admins.models import AdminUser
 
 
 class HealthView(APIView):
@@ -24,7 +25,13 @@ class MeView(APIView):
         except Organization.DoesNotExist:
             org_data = None
 
+        admin_sections = []
+        if request.user.auth.is_admin:
+            admin_user, _ = AdminUser.objects.get_or_create(logto_id=request.user.auth.sub)
+            admin_sections = admin_user.visible_sections()
+
         return Response({
             'auth': request.user.auth.to_dict(),
             'organization': org_data,
+            'admin_sections': admin_sections,
         })

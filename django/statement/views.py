@@ -6,7 +6,7 @@ from rest_framework import status
 from django.db import transaction
 from django.db.models import Sum
 from auth_middleware import AccessTokenAuthentication
-from admins.permissions import IsAdmin
+from admins.permissions import IsAdmin, require_section
 from common import get_organization
 from requests.models import Request
 from statement.models import Receipt, BankTransfer
@@ -117,7 +117,7 @@ class AdminIncomingPaymentDetailView(APIView):
 
 class AdminBankTransferListView(APIView):
     authentication_classes = [AccessTokenAuthentication]
-    permission_classes = [IsAdmin]
+    permission_classes = [require_section('transfers')]
 
     def get(self, request):
         qs = BankTransfer.objects.select_related('from_recipient', 'to_recipient').all()
@@ -133,7 +133,7 @@ class AdminBankTransferListView(APIView):
 
 class AdminBankTransferDetailView(APIView):
     authentication_classes = [AccessTokenAuthentication]
-    permission_classes = [IsAdmin]
+    permission_classes = [require_section('transfers')]
 
     def delete(self, request, pk):
         try:

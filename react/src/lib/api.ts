@@ -447,7 +447,11 @@ export const api = {
     request<Omit<ExchangeRate, "source">[]>('/rates/latest/'),
 
   getMe: () =>
-    request<{ auth: { is_admin: boolean }; organization: { id: number; name: string; percent_client: string } | null }>('/me/'),
+    request<{
+      auth: { is_admin: boolean }
+      organization: { id: number; name: string; percent_client: string } | null
+      admin_sections: string[]
+    }>('/me/'),
 
   getAdminPayers: () =>
     request<AdminPayer[]>('/admin/payers/'),

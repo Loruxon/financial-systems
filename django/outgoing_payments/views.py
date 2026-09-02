@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import MultiPartParser
 from auth_middleware import AccessTokenAuthentication
-from admins.permissions import IsAdmin
+from admins.permissions import require_section
 from organizations.models import Recipient
 from requests.models import Request
 from outgoing_payments.models import OutgoingPayment, OutgoingPaymentDocument
@@ -16,7 +16,7 @@ DEFAULT_ACCOUNT_NAME = 'CIC'
 
 class OutgoingPaymentListView(APIView):
     authentication_classes = [AccessTokenAuthentication]
-    permission_classes = [IsAdmin]
+    permission_classes = [require_section('outgoing_payments')]
 
     def get(self, request):
         qs = OutgoingPayment.objects.select_related('account').prefetch_related('requests').all()
@@ -36,7 +36,7 @@ class OutgoingPaymentListView(APIView):
 
 class OutgoingPaymentDetailView(APIView):
     authentication_classes = [AccessTokenAuthentication]
-    permission_classes = [IsAdmin]
+    permission_classes = [require_section('outgoing_payments')]
 
     def get_object(self, pk):
         try:
@@ -74,7 +74,7 @@ class OutgoingPaymentDetailView(APIView):
 
 class OutgoingPaymentDocumentListView(APIView):
     authentication_classes = [AccessTokenAuthentication]
-    permission_classes = [IsAdmin]
+    permission_classes = [require_section('outgoing_payments')]
     parser_classes = [MultiPartParser]
 
     def get_payment(self, pk):
@@ -97,7 +97,7 @@ class OutgoingPaymentDocumentListView(APIView):
 
 class OutgoingPaymentDocumentDetailView(APIView):
     authentication_classes = [AccessTokenAuthentication]
-    permission_classes = [IsAdmin]
+    permission_classes = [require_section('outgoing_payments')]
 
     def get_object(self, pk):
         try:

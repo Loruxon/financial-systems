@@ -8,7 +8,7 @@ from rest_framework.parsers import MultiPartParser
 from django.db import transaction
 from auth_middleware import AccessTokenAuthentication
 from admins.models import AdminUser
-from admins.permissions import IsAdmin
+from admins.permissions import IsAdmin, require_section
 from admins.serializers import (
     AdminRequestListSerializer, AdminRequestSerializer, AdminUserSerializer, AdminPayerSerializer,
     AdminDocumentSerializer, WorkSchemeSerializer,
@@ -62,7 +62,7 @@ class AdminOrganizationBalanceListView(APIView):
     """Текущий снимок по каждой организации — те же данные, что и в /statement у клиента,
     только сразу по всем организациям."""
     authentication_classes = [AccessTokenAuthentication]
-    permission_classes = [IsAdmin]
+    permission_classes = [require_section('organization_balances')]
 
     def get(self, request):
         received = _sum_by_organization(
@@ -106,7 +106,7 @@ class AdminRequestListView(APIView):
 
 class AdminRequestDetailView(APIView):
     authentication_classes = [AccessTokenAuthentication]
-    permission_classes = [IsAdmin]
+    permission_classes = [require_section('requests')]
 
     def get_object(self, pk):
         try:
@@ -164,7 +164,7 @@ class AdminRequestDetailView(APIView):
 
 class AdminDocumentListView(APIView):
     authentication_classes = [AccessTokenAuthentication]
-    permission_classes = [IsAdmin]
+    permission_classes = [require_section('requests')]
     parser_classes = [MultiPartParser]
 
     def get_request_instance(self, pk):
@@ -195,7 +195,7 @@ class AdminDocumentListView(APIView):
 
 class AdminDocumentDetailView(APIView):
     authentication_classes = [AccessTokenAuthentication]
-    permission_classes = [IsAdmin]
+    permission_classes = [require_section('requests')]
 
     def get_object(self, pk):
         try:
