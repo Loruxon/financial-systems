@@ -8,7 +8,6 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Field,
   FieldGroup,
@@ -27,7 +26,7 @@ import { SideCard, SideCardHeader, SideCardContent, SideCardFooter } from "@/com
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { api, type Counterparty, type Bank, type Recipient, type Payer, type Receipt } from "@/lib/api"
 import { cn, toApiDate, toApiDecimal, fmtNum, formatAccountNumber, showFieldError } from "@/lib/utils"
-import { FileText, Banknote, ChevronsUpDown, Plus, Paperclip, Files, Send, TriangleAlert, MessageSquareText, PencilLine } from "lucide-react"
+import { FileText, Banknote, ChevronsUpDown, Plus, Paperclip, Files, Send, TriangleAlert, MessageSquareText, PencilLine, X } from "lucide-react"
 import { BankItem } from "./form-parts"
 import { AddBankDialog } from "../counterparty/add-bank-dialog"
 import { EditBankDialog } from "../counterparty/edit-bank-dialog"
@@ -206,6 +205,11 @@ export function RequestForm({
   const prfFromReceiptLocked = prfLocked || !!selectedReceipt
   const prfAmountLocked = prfLocked || (!!selectedReceipt && !allowCustomAmount)
 
+  // Полностью выбранные другими заявками поступления скрываем — выбирать
+  // больше нечего. Кроме уже выбранного в этой заявке — иначе пропадёт из
+  // списка сразу после выбора (у него самого remaining часто = 0).
+  const selectableReceipts = receipts.filter((r) => parseFloat(r.remaining_amount) > 0 || r.id === selectedReceiptId)
+
   const handleSelectReceipt = (r: Receipt) => {
     setSelectedReceiptId(r.id)
     setAllowCustomAmount(false)
@@ -213,7 +217,9 @@ export function RequestForm({
     form.setValue("prfInn", r.payer_inn ?? "", { shouldValidate: true, shouldTouch: true })
     form.setValue("prfDate", r.date.split("-").reverse().join("."), { shouldValidate: true, shouldTouch: true })
     form.setValue("prfRecipient", r.recipient_name ?? "", { shouldValidate: true, shouldTouch: true })
-    form.setValue("prfAmount", r.amount, { shouldValidate: true, shouldTouch: true })
+    // Не полная сумма поступления, а остаток — если часть уже разобрана
+    // другими заявками, дефолт не должен требовать больше, чем осталось.
+    form.setValue("prfAmount", r.remaining_amount, { shouldValidate: true, shouldTouch: true })
     setReceiptOpen(false)
   }
 
@@ -224,7 +230,7 @@ export function RequestForm({
 
   const receiptAmountExceeded = !!selectedReceipt && allowCustomAmount &&
     (() => {
-      const max = parseFloat(selectedReceipt.amount)
+      const max = parseFloat(selectedReceipt.remaining_amount)
       const entered = parseFloat(toApiDecimal(form.watch("prfAmount") || "0"))
       return !Number.isNaN(entered) && entered > max
     })()
@@ -583,10 +589,17 @@ export function RequestForm({
                         <Popover open={receiptOpen} onOpenChange={setReceiptOpen}>
                           <PopoverTrigger asChild>
                             <button type="button" disabled={prfLocked} className={triggerClass(false)}>
-                              <span className={selectedReceipt ? "" : "text-foreground-secondary"}>
-                                {selectedReceipt
-                                  ? `${selectedReceipt.date.split("-").reverse().join(".")} · ${fmtNum(parseFloat(selectedReceipt.amount))} ₽`
-                                  : "Заполнить вручную (без поступления)"}
+                              <span className="flex min-w-0 items-baseline gap-2">
+                                <span className={cn("truncate", !selectedReceipt && "text-foreground-secondary")}>
+                                  {selectedReceipt
+                                    ? `${selectedReceipt.date.split("-").reverse().join(".")} · ${fmtNum(parseFloat(selectedReceipt.amount))} ₽`
+                                    : "Заполнить вручную (без поступления)"}
+                                </span>
+                                {selectedReceipt && parseFloat(selectedReceipt.remaining_amount) < parseFloat(selectedReceipt.amount) && (
+                                  <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0">
+                                    остаток {fmtNum(parseFloat(selectedReceipt.remaining_amount))} ₽
+                                  </span>
+                                )}
                               </span>
                               <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
                             </button>
@@ -601,21 +614,28 @@ export function RequestForm({
                               <CommandList>
                                 <CommandEmpty>Не найдено</CommandEmpty>
                                 <CommandGroup>
-                                  {receipts.map((r) => (
-                                    <CommandItem
-                                      key={r.id}
-                                      value={`${r.payer_name ?? ""} ${r.recipient_name ?? ""} ${r.date}`}
-                                      data-checked={selectedReceiptId === r.id}
-                                      onSelect={() => handleSelectReceipt(r)}
-                                    >
-                                      <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
-                                        <span className="truncate">{r.payer_name ?? "—"} → {r.recipient_name ?? "—"}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                          {r.date.split("-").reverse().join(".")} · {fmtNum(parseFloat(r.amount))} ₽
-                                        </span>
-                                      </div>
-                                    </CommandItem>
-                                  ))}
+                                  {selectableReceipts.map((r) => {
+                                    const remaining = parseFloat(r.remaining_amount)
+                                    const partiallyUsed = remaining < parseFloat(r.amount)
+                                    return (
+                                      <CommandItem
+                                        key={r.id}
+                                        value={`${r.payer_name ?? ""} ${r.recipient_name ?? ""} ${r.date}`}
+                                        data-checked={selectedReceiptId === r.id}
+                                        onSelect={() => handleSelectReceipt(r)}
+                                      >
+                                        <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
+                                          <span className="truncate">{r.payer_name ?? "—"} → {r.recipient_name ?? "—"}</span>
+                                          <span className="text-xs text-muted-foreground">
+                                            {r.date.split("-").reverse().join(".")} · {fmtNum(parseFloat(r.amount))} ₽
+                                            {partiallyUsed && (
+                                              <span className="text-amber-600 dark:text-amber-400"> · остаток {fmtNum(remaining)} ₽</span>
+                                            )}
+                                          </span>
+                                        </div>
+                                      </CommandItem>
+                                    )
+                                  })}
                                 </CommandGroup>
                               </CommandList>
                             </Command>
@@ -679,7 +699,23 @@ export function RequestForm({
                       control={form.control}
                       render={({ field, fieldState }) => (
                         <Field data-invalid={invalidOf(fieldState)}>
-                          <FieldLabel htmlFor="prf-amount" error={invalidOf(fieldState) ? fieldState.error?.message : undefined}>Сумма, ₽</FieldLabel>
+                          <div className="flex items-center justify-between">
+                            <FieldLabel htmlFor="prf-amount" error={invalidOf(fieldState) ? fieldState.error?.message : undefined}>Сумма, ₽</FieldLabel>
+                            {selectedReceipt && !prfLocked && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = !allowCustomAmount
+                                  setAllowCustomAmount(next)
+                                  if (!next) form.setValue("prfAmount", selectedReceipt.remaining_amount, { shouldValidate: true, shouldTouch: true })
+                                }}
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                {allowCustomAmount ? <X className="h-3 w-3" /> : <PencilLine className="h-3 w-3" />}
+                                {allowCustomAmount ? "Сумма поступления" : "Другая сумма"}
+                              </button>
+                            )}
+                          </div>
                           <Input size="lg"
                             {...field}
                             id="prf-amount"
@@ -689,20 +725,13 @@ export function RequestForm({
                           />
                           {receiptAmountExceeded && (
                             <p className="text-xs text-destructive">
-                              Сумма больше остатка поступления ({fmtNum(parseFloat(selectedReceipt!.amount))} ₽)
+                              Сумма больше остатка поступления ({fmtNum(parseFloat(selectedReceipt!.remaining_amount))} ₽)
                             </p>
                           )}
-                          {selectedReceipt && !prfLocked && (
-                            <div className="flex items-start gap-2 pt-1">
-                              <Checkbox
-                                id="allow-custom-amount"
-                                checked={allowCustomAmount}
-                                onCheckedChange={(checked) => setAllowCustomAmount(!!checked)}
-                              />
-                              <label htmlFor="allow-custom-amount" className="text-xs text-muted-foreground leading-snug cursor-pointer">
-                                Пока не знаю точную сумму заявки — это поступление разделится на несколько заявок
-                              </label>
-                            </div>
+                          {allowCustomAmount && selectedReceipt && !receiptAmountExceeded && (
+                            <FieldDescription>
+                              Поступление разделится на несколько заявок
+                            </FieldDescription>
                           )}
                         </Field>
                       )}

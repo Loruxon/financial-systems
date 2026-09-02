@@ -183,6 +183,7 @@ export type Receipt = {
   status: ReceiptStatus
   requests: number[]
   request_invoices: { id: number; invoice: string }[]
+  remaining_amount: string
   confirmed_at: string | null
   created_at: string
 }

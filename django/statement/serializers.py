@@ -1,3 +1,4 @@
+from decimal import Decimal
 from rest_framework import serializers
 from statement.models import Receipt, BankTransfer
 
@@ -9,9 +10,14 @@ class ReceiptBaseSerializer(serializers.ModelSerializer):
     organization_id = serializers.IntegerField(source='payer.organization.id', read_only=True, default=None)
     organization_name = serializers.CharField(source='payer.organization.name', read_only=True, default=None)
     request_invoices = serializers.SerializerMethodField()
+    remaining_amount = serializers.SerializerMethodField()
 
     def get_request_invoices(self, obj):
         return [{'id': r.id, 'invoice': r.invoice} for r in obj.requests.all()]
+
+    def get_remaining_amount(self, obj):
+        used = sum((r.prf_amount for r in obj.requests.all() if r.prf_amount is not None), Decimal('0'))
+        return str(obj.amount - used)
 
     class Meta:
         model = Receipt
@@ -25,7 +31,7 @@ class ReceiptSerializer(ReceiptBaseSerializer):
             'recipient', 'recipient_name',
             'payer', 'payer_name', 'payer_inn',
             'organization_id', 'organization_name',
-            'status', 'requests', 'request_invoices',
+            'status', 'requests', 'request_invoices', 'remaining_amount',
             'confirmed_at', 'created_at',
         ]
         read_only_fields = ['net_amount', 'status', 'requests', 'request_invoices', 'confirmed_at', 'created_at']
@@ -62,6 +68,6 @@ class ReceiptListSerializer(ReceiptBaseSerializer):
             'recipient', 'recipient_name',
             'payer', 'payer_name', 'payer_inn',
             'organization_id', 'organization_name',
-            'status', 'requests', 'request_invoices',
+            'status', 'requests', 'request_invoices', 'remaining_amount',
             'confirmed_at', 'created_at',
         ]
