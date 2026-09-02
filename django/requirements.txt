@@ -1,8 +1,24 @@
-Django
-djangorestframework
-psycopg2-binary
-gunicorn
-PyJWT[crypto]
-django-cors-headers
-django-storages[s3]
-whitenoise
+Django==6.1
+djangorestframework==3.18.0
+psycopg2-binary==2.9.12
+gunicorn==26.2.0
+PyJWT[crypto]==2.13.0
+django-cors-headers==4.9.0
+django-storages[s3]==1.14.6
+whitenoise==6.12.0
+
+# Транзитивные зависимости — зафиксированы для воспроизводимой сборки
+# (pip install иначе каждый раз тянет последние версии, а docker-compose.prod.yml
+# пересобирает образ на каждый deploy.sh).
+asgiref==3.12.1
+boto3==1.43.86
+botocore==1.43.86
+cffi==2.1.1
+cryptography==50.0.1
+jmespath==1.1.0
+pycparser==3.0
+python-dateutil==2.9.0.post0
+s3transfer==0.19.2
+six==1.17.0
+sqlparse==0.6.0
+urllib3==2.7.0
