@@ -8,6 +8,8 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Field,
   FieldGroup,
@@ -153,6 +155,11 @@ export function RequestForm({
   // Клиент пока не знает точную сумму заявки (поступление разделится на
   // несколько заявок) — разблокирует ручной ввод суммы поверх суммы поступления.
   const [allowCustomAmount, setAllowCustomAmount] = useState(defaultValues.receiptId != null)
+  // Постоплата — рублей ещё не было, доступна только пока не выбрано
+  // поступление (иначе противоречие: поступление есть, а оплаты нет).
+  const [isPostpayment, setIsPostpayment] = useState(
+    defaultValues.receiptId == null && defaultValues.prfAmount === "0"
+  )
 
   const form = useForm<RequestFormValues>({
     resolver: zodResolver(requestSchema),
@@ -203,7 +210,7 @@ export function RequestForm({
 
   const selectedReceipt = receipts.find((r) => r.id === selectedReceiptId) ?? null
   const prfFromReceiptLocked = prfLocked || !!selectedReceipt
-  const prfAmountLocked = prfLocked || (!!selectedReceipt && !allowCustomAmount)
+  const prfAmountLocked = prfLocked || (!!selectedReceipt && !allowCustomAmount) || isPostpayment
 
   // Полностью выбранные другими заявками поступления скрываем — выбирать
   // больше нечего. Кроме уже выбранного в этой заявке — иначе пропадёт из
@@ -213,6 +220,7 @@ export function RequestForm({
   const handleSelectReceipt = (r: Receipt) => {
     setSelectedReceiptId(r.id)
     setAllowCustomAmount(false)
+    setIsPostpayment(false)
     form.setValue("prfOrg", r.payer_name ?? "", { shouldValidate: true, shouldTouch: true })
     form.setValue("prfInn", r.payer_inn ?? "", { shouldValidate: true, shouldTouch: true })
     form.setValue("prfDate", r.date.split("-").reverse().join("."), { shouldValidate: true, shouldTouch: true })
@@ -399,23 +407,6 @@ export function RequestForm({
                     />
 
                     <Controller
-                      name="details"
-                      control={form.control}
-                      render={({ field, fieldState }) => (
-                        <Field data-invalid={invalidOf(fieldState)}>
-                          <FieldLabel htmlFor="req-details" error={invalidOf(fieldState) ? fieldState.error?.message : undefined}>Детали платежа</FieldLabel>
-                          <Input size="lg"
-                            {...field}
-                            id="req-details"
-                            placeholder="Payment for PI 015757 DD: 13.04.2026"
-                            aria-invalid={invalidOf(fieldState)}
-                            disabled={paymentLocked}
-                          />
-                        </Field>
-                      )}
-                    />
-
-                    <Controller
                       name="counterpartyId"
                       control={form.control}
                       render={({ field, fieldState }) => (
@@ -562,6 +553,24 @@ export function RequestForm({
                       )}
                     />
 
+                    <Controller
+                      name="details"
+                      control={form.control}
+                      render={({ field, fieldState }) => (
+                        <Field data-invalid={invalidOf(fieldState)}>
+                          <FieldLabel htmlFor="req-details" error={invalidOf(fieldState) ? fieldState.error?.message : undefined}>Детали платежа</FieldLabel>
+                          <Textarea
+                            {...field}
+                            id="req-details"
+                            placeholder="Payment for PI 015757 DD: 13.04.2026"
+                            className="min-h-12 text-sm"
+                            aria-invalid={invalidOf(fieldState)}
+                            disabled={paymentLocked}
+                          />
+                        </Field>
+                      )}
+                    />
+
                   </FieldGroup>
                 </BlockCardContent>
               </BlockCard>
@@ -700,7 +709,7 @@ export function RequestForm({
                       render={({ field, fieldState }) => (
                         <Field data-invalid={invalidOf(fieldState)}>
                           <div className="flex items-center justify-between">
-                            <FieldLabel htmlFor="prf-amount" error={invalidOf(fieldState) ? fieldState.error?.message : undefined}>Сумма, ₽</FieldLabel>
+                            <FieldLabel htmlFor="prf-amount">Сумма, ₽</FieldLabel>
                             {selectedReceipt && !prfLocked && (
                               <button
                                 type="button"
@@ -715,6 +724,20 @@ export function RequestForm({
                                 {allowCustomAmount ? "Сумма поступления" : "Другая сумма"}
                               </button>
                             )}
+                            {!selectedReceipt && !prfLocked && (
+                              <label htmlFor="prf-postpayment" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                                <Checkbox
+                                  id="prf-postpayment"
+                                  checked={isPostpayment}
+                                  onCheckedChange={(checked) => {
+                                    const next = !!checked
+                                    setIsPostpayment(next)
+                                    form.setValue("prfAmount", next ? "0" : "", { shouldValidate: true, shouldTouch: true })
+                                  }}
+                                />
+                                Постоплата
+                              </label>
+                            )}
                           </div>
                           <Input size="lg"
                             {...field}
@@ -723,10 +746,18 @@ export function RequestForm({
                             aria-invalid={invalidOf(fieldState)}
                             disabled={prfAmountLocked}
                           />
+                          {invalidOf(fieldState) && fieldState.error?.message && (
+                            <p className="text-xs text-destructive">{fieldState.error.message}</p>
+                          )}
                           {receiptAmountExceeded && (
                             <p className="text-xs text-destructive">
                               Сумма больше остатка поступления ({fmtNum(parseFloat(selectedReceipt!.remaining_amount))} ₽)
                             </p>
+                          )}
+                          {isPostpayment && (
+                            <FieldDescription>
+                              Оплата будет внесена позже
+                            </FieldDescription>
                           )}
                           {allowCustomAmount && selectedReceipt && !receiptAmountExceeded && (
                             <FieldDescription>
