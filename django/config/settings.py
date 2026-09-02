@@ -175,7 +175,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-ADMIN_ORGANIZATION_ID = os.getenv('ADMIN_ORGANIZATION_ID', 'zstdm8r93u1c')
+ADMIN_ORGANIZATION_ID = os.getenv('ADMIN_ORGANIZATION_ID', '')
 
 CORS_ALLOWED_ORIGINS = [
     'https://app.board.fbridge.pro',
