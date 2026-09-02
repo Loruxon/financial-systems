@@ -2,7 +2,7 @@ from django.urls import path
 from admins.views import (
     AdminUserListView, AdminRequestListView, AdminRequestDetailView, AdminPayerListView,
     AdminDocumentListView, AdminDocumentDetailView, AdminWorkSchemeListView,
-    AdminOrganizationBalanceListView,
+    AdminOrganizationBalanceListView, AdminRecipientBalanceListView,
 )
 
 urlpatterns = [
@@ -14,4 +14,5 @@ urlpatterns = [
     path('admin/payers/', AdminPayerListView.as_view(), name='admin-payer-list'),
     path('admin/schemes/', AdminWorkSchemeListView.as_view(), name='admin-scheme-list'),
     path('admin/organization-balances/', AdminOrganizationBalanceListView.as_view(), name='admin-organization-balance-list'),
+    path('admin/recipient-balances/', AdminRecipientBalanceListView.as_view(), name='admin-recipient-balance-list'),
 ]

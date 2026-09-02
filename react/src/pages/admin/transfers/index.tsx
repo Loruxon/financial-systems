@@ -4,29 +4,33 @@ import { toast } from "sonner"
 import { PageHeader } from "@/components/page-header"
 import { DataTable } from "@/components/data-table"
 import { Button } from "@/components/ui/button"
-import { api, type BankTransfer, type Receipt, type Recipient, type OutgoingPayment } from "@/lib/api"
-import { useRecipientBalances } from "@/hooks/use-recipient-balances"
+import { api, type BankTransfer, type Recipient } from "@/lib/api"
+import { useAuth } from "@/lib/auth-context"
 import { columns, type TransferRow } from "./columns"
 import { AddTransferDialog } from "./add-transfer-dialog"
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminTransfersPage() {
+  const { adminSections } = useAuth()
   const [transfers, setTransfers] = useState<BankTransfer[]>([])
-  const [receipts, setReceipts] = useState<Receipt[]>([])
   const [recipients, setRecipients] = useState<Recipient[]>([])
-  const [outgoingPayments, setOutgoingPayments] = useState<OutgoingPayment[]>([])
+  const [byRecipient, setByRecipient] = useState<{ id: number; total: number }[]>([])
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
 
   useEffect(() => {
     api.getAdminTransfers().then(setTransfers).catch(() => toast.error("Не удалось загрузить переводы"))
-    api.getAdminIncomingPayments().then(setReceipts).catch(() => toast.error("Не удалось загрузить поступления"))
     api.getRecipients().then(setRecipients).catch(() => toast.error("Не удалось загрузить счета"))
-    api.getOutgoingPayments().then(setOutgoingPayments).catch(() => toast.error("Не удалось загрузить исходящие платежи"))
+    // Отдельное право доступа — у ограниченного админа с доступом только к
+    // "Переводам" его может не быть, тогда просто не показываем баланс в диалоге.
+    if (adminSections.includes("recipient_balances")) {
+      api.getRecipientBalances()
+        .then((rows) => setByRecipient(rows.map((r) => ({ id: r.id, total: parseFloat(r.total) }))))
+        .catch(() => {})
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const byRecipient = useRecipientBalances(receipts, transfers, recipients, outgoingPayments)
 
   const handleDelete = async (id: number) => {
     setDeletingIds((prev) => new Set(prev).add(id))

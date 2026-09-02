@@ -10,12 +10,11 @@ import { AmountInput } from "@/components/amount-input"
 import { DatePicker } from "@/components/ui/date-picker"
 import { cn, fmtNum, toApiDate, toApiDecimal } from "@/lib/utils"
 import { api, type BankTransfer, type Recipient } from "@/lib/api"
-import type { RecipientBalance } from "@/hooks/use-recipient-balances"
 
 export function AddTransferDialog({ open, recipients, balances, onClose, onCreated }: {
   open: boolean
   recipients: Recipient[]
-  balances: RecipientBalance[]
+  balances: { id: number; total: number }[]
   onClose: () => void
   onCreated: (t: BankTransfer) => void
 }) {

@@ -9,6 +9,10 @@ SECTION_TRANSFERS = 'transfers'
 SECTION_INCOMING_PAYMENTS = 'incoming_payments'
 SECTION_OUTGOING_PAYMENTS = 'outgoing_payments'
 SECTION_ORGANIZATION_BALANCES = 'organization_balances'
+# Не пункт меню, а карточки счетов (ATL/CIC/...) в шапке — показываются на
+# всех admin-страницах, поэтому доступ к ним настраивается отдельно от
+# конкретных разделов.
+SECTION_RECIPIENT_BALANCES = 'recipient_balances'
 
 SECTION_CHOICES = [
     (SECTION_REQUESTS, 'Заявки'),
@@ -17,6 +21,7 @@ SECTION_CHOICES = [
     (SECTION_INCOMING_PAYMENTS, 'Поступления'),
     (SECTION_OUTGOING_PAYMENTS, 'Исходящие платежи'),
     (SECTION_ORGANIZATION_BALANCES, 'Балансы организаций'),
+    (SECTION_RECIPIENT_BALANCES, 'Балансы счетов (в шапке)'),
 ]
 ALL_SECTIONS = [key for key, _ in SECTION_CHOICES]
 

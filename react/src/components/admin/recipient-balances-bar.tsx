@@ -3,39 +3,25 @@ import { Building2 } from "lucide-react"
 import { toast } from "sonner"
 import { Card } from "@/components/ui/card"
 import { cn, fmtNum } from "@/lib/utils"
-import { api, type BankTransfer, type Receipt, type Recipient, type OutgoingPayment } from "@/lib/api"
-import { useRecipientBalances } from "@/hooks/use-recipient-balances"
+import { api, type RecipientBalance } from "@/lib/api"
 import { RECIPIENT_ACCENT, RECIPIENT_SLOTS } from "@/lib/constants"
 
 // Балансы счетов-получателей (внутренние банковские счета — CIC/ATL/...), а не
 // клиентских организаций (для тех отдельная страница /admin/organization-balances).
 // Общий для всей админки блок: живёт в Layout, а не на отдельных страницах,
-// поэтому не дублируется на каждой странице списка.
+// поэтому не дублируется на каждой странице списка. Сам расчёт — на бэкенде
+// (/admin/recipient-balances/), у него своё право доступа, отдельное от
+// "Переводов"/"Исходящих платежей"/"Поступлений".
 export function RecipientBalancesBar() {
-  const [receipts, setReceipts] = useState<Receipt[]>([])
-  const [transfers, setTransfers] = useState<BankTransfer[]>([])
-  const [recipients, setRecipients] = useState<Recipient[]>([])
-  const [outgoingPayments, setOutgoingPayments] = useState<OutgoingPayment[]>([])
+  const [balances, setBalances] = useState<RecipientBalance[]>([])
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      api.getAdminIncomingPayments(),
-      api.getAdminTransfers(),
-      api.getRecipients(),
-      api.getOutgoingPayments(),
-    ])
-      .then(([r, t, rec, ops]) => {
-        setReceipts(r)
-        setTransfers(t)
-        setRecipients(rec)
-        setOutgoingPayments(ops)
-      })
+    api.getRecipientBalances()
+      .then(setBalances)
       .catch(() => toast.error("Не удалось загрузить балансы счетов"))
       .finally(() => setLoaded(true))
   }, [])
-
-  const byRecipient = useRecipientBalances(receipts, transfers, recipients, outgoingPayments)
 
   if (!loaded) {
     return (
@@ -62,13 +48,14 @@ export function RecipientBalancesBar() {
   return (
     <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 px-4 pt-4">
       {Array.from({ length: RECIPIENT_SLOTS }).map((_, i) => {
-        const rec = byRecipient[i]
+        const rec = balances[i]
         if (!rec) return (
           <div key={i} className="rounded-xl border border-dashed bg-muted/10 flex items-center justify-center min-h-[110px]">
             <span className="text-xs text-muted-foreground/30">—</span>
           </div>
         )
-        const negative = rec.total < 0
+        const total = parseFloat(rec.total)
+        const negative = total < 0
         return (
           <Card key={rec.id} className="gap-0 overflow-hidden py-0 transition-shadow hover:shadow-sm">
             <div className={cn("h-1 w-full", RECIPIENT_ACCENT.bar)} />
@@ -86,7 +73,7 @@ export function RecipientBalancesBar() {
                   "text-2xl font-semibold tabular-nums tracking-tight",
                   negative ? "text-destructive" : RECIPIENT_ACCENT.amount
                 )}>
-                  {fmtNum(rec.total)} ₽
+                  {fmtNum(total)} ₽
                 </span>
                 <span className="text-xs text-muted-foreground">На счёте</span>
               </div>

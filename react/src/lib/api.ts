@@ -78,6 +78,12 @@ export type Recipient = {
   initial_balance: string
 }
 
+export type RecipientBalance = {
+  id: number
+  name: string
+  total: string
+}
+
 export type Payer = {
   id: number
   name: string
@@ -378,6 +384,9 @@ type RequestUpdateData = Partial<RequestCreateData & {
 export const api = {
   getRecipients: () =>
     request<Recipient[]>('/recipients/'),
+
+  getRecipientBalances: () =>
+    request<RecipientBalance[]>('/admin/recipient-balances/'),
 
   getPayers: () =>
     request<Payer[]>('/payers/'),

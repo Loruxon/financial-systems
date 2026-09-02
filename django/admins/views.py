@@ -14,10 +14,11 @@ from admins.serializers import (
     AdminDocumentSerializer, WorkSchemeSerializer,
 )
 from requests.models import Request, Document
-from organizations.models import Organization, Payer
+from organizations.models import Organization, Payer, Recipient
 from schemes.models import WorkScheme
-from statement.models import Receipt
+from statement.models import Receipt, BankTransfer
 from statement.views import FROZEN_STATUSES
+from outgoing_payments.models import OutgoingPayment
 
 
 def get_or_create_admin(request):
@@ -92,6 +93,50 @@ class AdminOrganizationBalanceListView(APIView):
                 'frozen': str(frozen_v),
             })
 
+        return Response(rows)
+
+
+class AdminRecipientBalanceListView(APIView):
+    """Баланс каждого внутреннего счёта (Recipient — ATL/CIC/...) — карточки
+    в шапке админки. Раньше считалось на фронте (useRecipientBalances) из
+    четырёх отдельных списков; здесь та же логика, но одним запросом и с
+    собственным правом доступа, не завязанным на разделы "Переводы"/
+    "Исходящие платежи"/"Поступления"."""
+    authentication_classes = [AccessTokenAuthentication]
+    permission_classes = [require_section('recipient_balances')]
+
+    def get(self, request):
+        balances = {
+            r.id: {'id': r.id, 'name': r.name, 'total': r.initial_balance}
+            for r in Recipient.objects.all()
+        }
+
+        for r in Receipt.objects.filter(status=Receipt.CONFIRMED, recipient_id__isnull=False):
+            entry = balances.get(r.recipient_id)
+            if not entry:
+                continue
+            net = r.net_amount if r.net_amount is not None else r.amount * Decimal('0.998')
+            entry['total'] += net
+
+        for t in BankTransfer.objects.all():
+            from_entry = balances.get(t.from_recipient_id)
+            if from_entry:
+                from_entry['total'] -= t.amount
+            to_entry = balances.get(t.to_recipient_id)
+            if to_entry:
+                to_entry['total'] += t.amount
+
+        # Списываем только реально исполненные платежи — пока платёж
+        # "Новый"/"В работе"/"На исполнении", деньги со счёта ещё не ушли.
+        executed = OutgoingPayment.objects.filter(
+            status=OutgoingPayment.EXECUTED, account_id__isnull=False, amount__isnull=False,
+        )
+        for op in executed:
+            entry = balances.get(op.account_id)
+            if entry:
+                entry['total'] -= op.amount
+
+        rows = [{'id': b['id'], 'name': b['name'], 'total': str(b['total'])} for b in balances.values()]
         return Response(rows)
 
 

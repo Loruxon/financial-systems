@@ -15,7 +15,7 @@ import {
 const isAdminIndexPath = (pathname: string) => /^\/admin\/[^/]+\/?$/.test(pathname)
 
 export default function Layout() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, adminSections } = useAuth()
   const { pathname } = useLocation()
 
   return (
@@ -30,7 +30,7 @@ export default function Layout() {
         </header>
         {/* Общий для всей админки блок балансов счетов — один компонент вместо
             дублирования на каждой странице списка. */}
-        {isAdmin && isAdminIndexPath(pathname) && <RecipientBalancesBar />}
+        {isAdmin && isAdminIndexPath(pathname) && adminSections.includes("recipient_balances") && <RecipientBalancesBar />}
         <div className="flex flex-1 flex-col">
           <Outlet />
         </div>
