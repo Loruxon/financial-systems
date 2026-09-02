@@ -20,3 +20,13 @@ Django-команды выполняются внутри контейнера:
 ```
 docker compose exec django python manage.py <command>
 ```
+
+## Запуск в production-режиме
+
+Отдельный `docker-compose.prod.yml`: django собирается через gunicorn (`Dockerfile.prod`), react собирается статикой и отдаётся своим nginx (`Dockerfile.prod`), внешний nginx проксирует на них через TLS.
+
+```
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Требуется тот же `.env`, что и для dev (пароль БД, Django secret key, S3), плюс реальные TLS-сертификаты, смонтированные в nginx-контейнер (путь задан в `docker-compose.prod.yml`).

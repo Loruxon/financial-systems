@@ -5,3 +5,4 @@ gunicorn
 PyJWT[crypto]
 django-cors-headers
 django-storages[s3]
+whitenoise
