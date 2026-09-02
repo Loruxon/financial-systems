@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Plus, FileSpreadsheet, CircleCheck, CircleX, ChevronsUpDown, Info, ChevronDown, AlertTriangle, ArrowRight, TrendingUp, Upload } from "lucide-react"
 import * as XLSX from "xlsx"
 import { toast } from "sonner"
@@ -515,7 +515,6 @@ function ImportDialog({ open, onClose, onImported, recipients, payers }: {
   })
 
   const errorRows    = resolvedRows.filter(r => !r.valid)
-  const validRows    = resolvedRows.filter(r => r.valid)
   const readyRows    = resolvedRows.filter(r => r.ready)
   const notReadyRows = resolvedRows.filter(r => r.valid && !r.ready)
 

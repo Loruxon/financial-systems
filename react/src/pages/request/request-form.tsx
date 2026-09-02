@@ -48,7 +48,14 @@ const requestSchema = z.object({
   fileCount: z.number().min(1, "Добавьте хотя бы один документ"),
 })
 
-type RequestFormValues = z.infer<typeof requestSchema>
+// zodResolver инферит counterpartyId/bankId как number | null (refine не
+// сужает тип) — явно фиксируем то же самое здесь, иначе рассинхрон с типом
+// резолвера. Ненулевые они гарантированы только после прохождения валидации
+// (см. `!` в buildPayload).
+type RequestFormValues = Omit<z.infer<typeof requestSchema>, "counterpartyId" | "bankId"> & {
+  counterpartyId: number | null
+  bankId: number | null
+}
 
 interface FormValues {
   invoice?: string

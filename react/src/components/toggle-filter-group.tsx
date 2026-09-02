@@ -8,7 +8,7 @@ interface ToggleFilterOption<T extends string> {
 }
 
 interface ToggleFilterGroupProps<T extends string> {
-  options: ToggleFilterOption<T>[]
+  options: readonly ToggleFilterOption<T>[]
   value: T[]
   onChange: (value: T[]) => void
 }
