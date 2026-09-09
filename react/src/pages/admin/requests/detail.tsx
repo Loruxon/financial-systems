@@ -183,9 +183,9 @@ export default function AdminRequestDetailPage() {
 
   const syncExec = (r: AdminPaymentRequest) => {
     setExecDate(r.execution_date ? r.execution_date.split("-").reverse().join(".") : "")
-    setExecRate(r.execution_rate ?? "")
+    setExecRate(r.execution_rate ? fmtNum(r.execution_rate, 4) : "")
     setExecDateSebes(r.execution_date_sebes ? r.execution_date_sebes.split("-").reverse().join(".") : "")
-    setExecRateSebes(r.execution_rate_sebes ?? "")
+    setExecRateSebes(r.execution_rate_sebes ? fmtNum(r.execution_rate_sebes, 4) : "")
   }
 
   const handleSaveNote = async () => {
@@ -246,7 +246,7 @@ export default function AdminRequestDetailPage() {
           setRateHint({ text: `Нет курса ${request.currency} в ответе ЦБ за ${execDate}`, source: "error" })
           return
         }
-        setExecRate(value)
+        setExecRate(fmtNum(value, 4))
         setUsdRate(rate.usd ?? "")
         const label = `${rate.day_of_week} ${rate.cbr_date}`
         if (rate.is_different) {
@@ -275,7 +275,7 @@ export default function AdminRequestDetailPage() {
           setRateSebesHint({ text: `Нет курса ${request.currency} в ответе ЦБ за ${execDateSebes}`, source: "error" })
           return
         }
-        setExecRateSebes(value)
+        setExecRateSebes(fmtNum(value, 4))
         setUsdRateSebes(rate.usd ?? "")
         const label = `${rate.day_of_week} ${rate.cbr_date}`
         if (rate.is_different) {

@@ -51,14 +51,14 @@ export default function RequestDetailPage() {
 
   const formDefaults = {
     invoice: request.invoice,
-    amount: request.amount,
+    amount: request.amount ? fmtNum(request.amount) : request.amount,
     currency: request.currency,
     details: request.details,
     counterpartyId: request.counterparty,
     bankId: request.bank,
     prfOrg: request.prf_organization,
     prfInn: request.prf_inn,
-    prfAmount: request.prf_amount ?? undefined,
+    prfAmount: request.prf_amount ? fmtNum(request.prf_amount) : undefined,
     prfDate: request.prf_date ? request.prf_date.split("-").reverse().join(".") : undefined,
     prfRecipient: request.prf_recipient,
     receiptId: request.linked_receipt?.id ?? null,

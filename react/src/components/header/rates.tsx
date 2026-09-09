@@ -1,13 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { api } from "@/lib/api"
 import { Spinner } from "@/components/ui/spinner"
-import { cn } from "@/lib/utils"
+import { cn, fmtNum } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 type Rate = { date: string; usd: string; eur: string; cny: string }
 
 function fmt(val: string) {
-  return Number(val).toFixed(4)
+  return fmtNum(val, 4)
 }
 
 function fmtDate(iso: string) {
@@ -46,7 +46,7 @@ function RateItem({ symbol, label, value, prevValue }: {
           "text-[10px] font-medium tabular-nums",
           isUp ? "text-success" : "text-destructive"
         )}>
-          {isUp ? "▲" : "▼"}{Math.abs(delta!).toFixed(1)}%
+          {isUp ? "▲" : "▼"}{fmtNum(Math.abs(delta!), 1)}%
         </span>
       )}
     </div>

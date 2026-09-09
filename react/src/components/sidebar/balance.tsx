@@ -109,9 +109,9 @@ export function SidebarBalance({ className, ...props }: Omit<ComponentProps<type
           <div className="flex items-center justify-between gap-2 border-t border-sidebar-border pt-2.5 text-[10px] font-mono text-sidebar-foreground/60">
             <span className="tabular-nums">{rate.date.split("-").reverse().join(".")}</span>
             <div className="flex items-center gap-1.5 tabular-nums">
-              <span>${Number(rate.usd).toFixed(2)}</span>
-              <span>€{Number(rate.eur).toFixed(2)}</span>
-              <span>¥{Number(rate.cny).toFixed(2)}</span>
+              <span>${fmtNum(rate.usd)}</span>
+              <span>€{fmtNum(rate.eur)}</span>
+              <span>¥{fmtNum(rate.cny)}</span>
             </div>
           </div>
         )}

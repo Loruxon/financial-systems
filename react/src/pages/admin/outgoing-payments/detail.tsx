@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/page-header"
 import { BlockCard, BlockCardHeader, BlockCardContent } from "@/components/block-card"
 import { SideCard, SideCardHeader, SideCardContent, SideCardFooter } from "@/components/side-card"
 import { GenericStatusBadge, StatusDot } from "@/components/status-badge"
-import { toApiDecimal } from "@/lib/utils"
+import { toApiDecimal, fmtNum } from "@/lib/utils"
 import { api, type OutgoingPayment, type OutgoingPaymentStatus, type Recipient, type RequestListItem } from "@/lib/api"
 import { outgoingPaymentStatusConfig, formatDateTime } from "./columns"
 import { OutgoingPaymentDocuments } from "./documents"
@@ -51,7 +51,7 @@ export default function AdminOutgoingPaymentDetailPage() {
         setPayment(p)
         setInvoice(p.invoice)
         setSupplierName(p.supplier_name)
-        setAmount(p.amount ?? "")
+        setAmount(p.amount ? fmtNum(p.amount) : "")
         setAccountId(p.account_id)
         setStatus(p.status)
         setRecipients(recs)
@@ -64,7 +64,7 @@ export default function AdminOutgoingPaymentDetailPage() {
   const fieldsChanged = !!payment && (
     invoice !== payment.invoice ||
     supplierName !== payment.supplier_name ||
-    amount !== (payment.amount ?? "") ||
+    toApiDecimal(amount) !== (payment.amount ?? "") ||
     accountId !== payment.account_id
   )
 

@@ -7,8 +7,8 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} Б`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`
-  return `${(bytes / 1024 / 1024).toFixed(1)} МБ`
+  if (bytes < 1024 * 1024) return `${fmtNum(bytes / 1024, 1)} КБ`
+  return `${fmtNum(bytes / 1024 / 1024, 1)} МБ`
 }
 
 // Достаёт файлы из буфера обмена — либо скопированные напрямую из
@@ -71,8 +71,11 @@ export const formatAccountNumber = (s: string) => {
   return IBAN_PREFIX.test(clean) ? formatIban(clean) : clean
 }
 
-const _numFmt = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-export const fmtNum = (n: number | string): string => _numFmt.format(typeof n === "string" ? parseFloat(n) : n)
+// digits по умолчанию 2 (деньги) — для курсов валют (нужна большая точность)
+// вызывающий код передаёт 4, для процентов/дельт — 1.
+export const fmtNum = (n: number | string, digits = 2): string =>
+  new Intl.NumberFormat("ru-RU", { minimumFractionDigits: digits, maximumFractionDigits: digits })
+    .format(typeof n === "string" ? parseFloat(n) : n)
 
 // Единое правило для всех ячеек таблиц: пустое значение — это "—", а не
 // visually пустое место (иначе строка выглядит недогруженной/сломанной).

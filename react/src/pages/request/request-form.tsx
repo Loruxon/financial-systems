@@ -227,7 +227,7 @@ export function RequestForm({
     form.setValue("prfRecipient", r.recipient_name ?? "", { shouldValidate: true, shouldTouch: true })
     // Не полная сумма поступления, а остаток — если часть уже разобрана
     // другими заявками, дефолт не должен требовать больше, чем осталось.
-    form.setValue("prfAmount", r.remaining_amount, { shouldValidate: true, shouldTouch: true })
+    form.setValue("prfAmount", fmtNum(r.remaining_amount), { shouldValidate: true, shouldTouch: true })
     setReceiptOpen(false)
   }
 
@@ -716,7 +716,7 @@ export function RequestForm({
                                 onClick={() => {
                                   const next = !allowCustomAmount
                                   setAllowCustomAmount(next)
-                                  if (!next) form.setValue("prfAmount", selectedReceipt.remaining_amount, { shouldValidate: true, shouldTouch: true })
+                                  if (!next) form.setValue("prfAmount", fmtNum(selectedReceipt.remaining_amount), { shouldValidate: true, shouldTouch: true })
                                 }}
                                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                               >
@@ -732,7 +732,7 @@ export function RequestForm({
                                   onCheckedChange={(checked) => {
                                     const next = !!checked
                                     setIsPostpayment(next)
-                                    form.setValue("prfAmount", next ? "0" : "", { shouldValidate: true, shouldTouch: true })
+                                    form.setValue("prfAmount", next ? fmtNum(0) : "", { shouldValidate: true, shouldTouch: true })
                                   }}
                                 />
                                 Постоплата
