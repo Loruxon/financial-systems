@@ -28,7 +28,7 @@ import { adminNav } from './components/app-sidebar'
 
 const logtoConfig: LogtoConfig = {
   endpoint: 'https://auth.board.fbridge.pro/',
-  appId: 'wjo13o1qyuongubiyndor',
+  appId: 'u7y1gztkhncqt732a5mu5',
   scopes: [UserScope.Organizations, UserScope.OrganizationRoles, UserScope.Profile, UserScope.Email],
   resources: ['https://api.board.fbridge.pro'],
 }
