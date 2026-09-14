@@ -12,6 +12,7 @@ import { BlockCard, BlockCardHeader, BlockCardContent } from "@/components/block
 import { toApiDecimal } from "@/lib/utils"
 import { api, type Recipient } from "@/lib/api"
 import { OutgoingPaymentDocuments, type OutgoingPaymentDocumentsHandle } from "./documents"
+import { SupplierField } from "./supplier-field"
 
 const DEFAULT_ACCOUNT_NAME = "CIC"
 
@@ -73,10 +74,7 @@ export default function AdminOutgoingPaymentAddPage() {
                 <Label>Инвойс</Label>
                 <Input size="lg" value={invoice} onChange={(e) => setInvoice(e.target.value)} placeholder="INV-000000" />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Наименование поставщика</Label>
-                <Input size="lg" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="ООО «Поставщик»" />
-              </div>
+              <SupplierField value={supplierName} onChange={setSupplierName} />
               <div className="flex flex-col gap-1.5">
                 <Label>Сумма, ₽</Label>
                 <Input size="lg" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value)} />

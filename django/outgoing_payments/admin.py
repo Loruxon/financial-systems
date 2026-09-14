@@ -1,5 +1,5 @@
 from django.contrib import admin
-from outgoing_payments.models import OutgoingPayment, OutgoingPaymentDocument
+from outgoing_payments.models import OutgoingPayment, OutgoingPaymentDocument, Supplier
 
 
 class OutgoingPaymentDocumentInline(admin.TabularInline):
@@ -13,3 +13,9 @@ class OutgoingPaymentAdmin(admin.ModelAdmin):
     list_filter = ['status', 'account']
     search_fields = ['invoice', 'supplier_name']
     inlines = [OutgoingPaymentDocumentInline]
+
+
+@admin.register(Supplier)
+class SupplierAdmin(admin.ModelAdmin):
+    list_display = ['name']
+    search_fields = ['name']

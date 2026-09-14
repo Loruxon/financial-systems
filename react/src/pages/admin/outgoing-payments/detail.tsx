@@ -17,6 +17,7 @@ import { api, type OutgoingPayment, type OutgoingPaymentStatus, type Recipient, 
 import { outgoingPaymentStatusConfig, formatDateTime } from "./columns"
 import { OutgoingPaymentDocuments } from "./documents"
 import { LinkRequestDialog } from "./link-request-dialog"
+import { SupplierField } from "./supplier-field"
 
 const ALL_STATUSES: OutgoingPaymentStatus[] = ["new", "in_work", "in_progress", "executed"]
 
@@ -135,10 +136,7 @@ export default function AdminOutgoingPaymentDetailPage() {
                   <Label>Инвойс</Label>
                   <Input size="lg" value={invoice} onChange={(e) => setInvoice(e.target.value)} placeholder="INV-000000" />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Наименование поставщика</Label>
-                  <Input size="lg" value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="ООО «Поставщик»" />
-                </div>
+                <SupplierField value={supplierName} onChange={setSupplierName} />
                 <div className="flex flex-col gap-1.5">
                   <Label>Сумма, ₽</Label>
                   <Input size="lg" placeholder="0,00" value={amount} onChange={(e) => setAmount(e.target.value)} />

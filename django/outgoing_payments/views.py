@@ -7,11 +7,27 @@ from auth_middleware import AccessTokenAuthentication
 from admins.permissions import require_section
 from organizations.models import Recipient
 from requests.models import Request
-from outgoing_payments.models import OutgoingPayment, OutgoingPaymentDocument
-from outgoing_payments.serializers import OutgoingPaymentSerializer, OutgoingPaymentDocumentSerializer
+from outgoing_payments.models import OutgoingPayment, OutgoingPaymentDocument, Supplier
+from outgoing_payments.serializers import (
+    OutgoingPaymentSerializer, OutgoingPaymentDocumentSerializer, SupplierSerializer,
+)
 
 # Счёт списания по умолчанию для нового платежа, если явно не указан другой.
 DEFAULT_ACCOUNT_NAME = 'CIC'
+
+
+class SupplierListView(APIView):
+    authentication_classes = [AccessTokenAuthentication]
+    permission_classes = [require_section('outgoing_payments')]
+
+    def get(self, request):
+        return Response(SupplierSerializer(Supplier.objects.all(), many=True).data)
+
+    def post(self, request):
+        serializer = SupplierSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        return Response(SupplierSerializer(instance).data, status=status.HTTP_201_CREATED)
 
 
 class OutgoingPaymentListView(APIView):

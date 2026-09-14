@@ -1,7 +1,18 @@
 from urllib.parse import quote
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 from organizations.models import Recipient
-from outgoing_payments.models import OutgoingPayment, OutgoingPaymentDocument
+from outgoing_payments.models import OutgoingPayment, OutgoingPaymentDocument, Supplier
+
+
+class SupplierSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        validators=[UniqueValidator(queryset=Supplier.objects.all(), message='Такой поставщик уже есть')],
+    )
+
+    class Meta:
+        model = Supplier
+        fields = ['id', 'name']
 
 
 def content_disposition(filename):

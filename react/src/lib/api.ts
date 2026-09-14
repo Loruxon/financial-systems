@@ -43,6 +43,12 @@ export type OutgoingPaymentDocumentItem = {
   uploaded_at: string
 }
 
+// Справочник поставщиков — для выбора в поле "Наименование поставщика".
+export type Supplier = {
+  id: number
+  name: string
+}
+
 let _getToken: (() => Promise<string | undefined>) | null = null
 
 export const initAuth = (getToken: () => Promise<string | undefined>) => {
@@ -537,6 +543,12 @@ export const api = {
 
   deleteAdminTransfer: (id: number) =>
     request<void>(`/admin/transfers/${id}/`, { method: 'DELETE' }),
+
+  getSuppliers: () =>
+    request<Supplier[]>('/admin/suppliers/'),
+
+  createSupplier: (data: { name: string }) =>
+    request<Supplier>('/admin/suppliers/', { method: 'POST', body: JSON.stringify(data) }),
 
   getOutgoingPayments: () =>
     request<OutgoingPayment[]>('/admin/outgoing-payments/'),

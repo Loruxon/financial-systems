@@ -6,6 +6,23 @@ def outgoing_payment_document_path(instance, filename):
     return f'outgoing-payments/{instance.outgoing_payment_id}/{filename}'
 
 
+class Supplier(models.Model):
+    """Справочник поставщиков — для выбора в поле "Наименование поставщика"
+    исходящего платежа. Само поле остаётся текстовым снимком (как Payer у
+    заявок), а не FK — чтобы переименование/удаление поставщика не задевало
+    уже созданные платежи."""
+    name = models.CharField(max_length=255, unique=True, verbose_name='Наименование поставщика')
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'suppliers'
+        verbose_name = 'Поставщик'
+        verbose_name_plural = 'Поставщики'
+        ordering = ['name']
+
+
 class OutgoingPayment(models.Model):
     NEW = 'new'
     IN_WORK = 'in_work'
