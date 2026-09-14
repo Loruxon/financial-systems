@@ -5,6 +5,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework import status
 from django.db import transaction
 from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from auth_middleware import AccessTokenAuthentication
 from admins.permissions import IsAdmin, require_section
 from common import get_organization
@@ -184,6 +185,9 @@ class StatementListView(APIView):
         # Теперь у неё свои поля, а payer_name/recipient_name честно пустые.
         for req in closed_requests:
             date = req.prf_date or req.created_at.date()
+            # Списываем фактические затраты на исполнение, а не всё поступление —
+            # "Остаток" (execution_balance) в списание не входит, он остаётся в балансе.
+            amount = req.execution_costs if req.execution_costs is not None else req.prf_amount
             transactions.append({
                 'id': req.id,
                 'date': date.isoformat(),
@@ -193,7 +197,7 @@ class StatementListView(APIView):
                 'requests': [
                     {'id': req.id, 'invoice': req.invoice, 'counterparty_name': req.counterparty_name or None},
                 ],
-                'amount': str(req.prf_amount),
+                'amount': str(amount),
             })
 
         transactions.sort(key=lambda x: x['date'])
@@ -212,17 +216,20 @@ class BalanceDetailView(APIView):
             status=Receipt.CONFIRMED,
         ).distinct().aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
+        # Как и в /statement — замораживаем и списываем execution_costs, если
+        # "Расчёт исполнения" уже сделан, иначе (пока неизвестна фактическая
+        # сумма затрат) резервируем всё поступление целиком.
         frozen = Request.objects.filter(
             organization=org,
             status__in=FROZEN_STATUSES,
             prf_amount__isnull=False,
-        ).aggregate(total=Sum('prf_amount'))['total'] or Decimal('0')
+        ).aggregate(total=Sum(Coalesce('execution_costs', 'prf_amount')))['total'] or Decimal('0')
 
         spent = Request.objects.filter(
             organization=org,
             status=Request.CLOSED,
             prf_amount__isnull=False,
-        ).aggregate(total=Sum('prf_amount'))['total'] or Decimal('0')
+        ).aggregate(total=Sum(Coalesce('execution_costs', 'prf_amount')))['total'] or Decimal('0')
 
         return Response({
             'received': str(received),

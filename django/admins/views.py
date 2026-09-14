@@ -1,5 +1,6 @@
 from decimal import Decimal
 from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -70,13 +71,18 @@ class AdminOrganizationBalanceListView(APIView):
             Receipt.objects.filter(status=Receipt.CONFIRMED),
             'payer__organization', 'amount',
         )
+        # Списываем/замораживаем не всё поступление, а фактические затраты на
+        # исполнение (execution_costs) — как только "Расчёт исполнения" сделан,
+        # "Остаток" (то, что не пошло на перевод) сразу возвращается в баланс
+        # организации. Пока расчёта ещё нет, держим прежним резервом — всю сумму
+        # поступления (prf_amount).
         spent = _sum_by_organization(
             Request.objects.filter(status=Request.CLOSED, prf_amount__isnull=False),
-            'organization', 'prf_amount',
+            'organization', Coalesce('execution_costs', 'prf_amount'),
         )
         frozen = _sum_by_organization(
             Request.objects.filter(status__in=FROZEN_STATUSES, prf_amount__isnull=False),
-            'organization', 'prf_amount',
+            'organization', Coalesce('execution_costs', 'prf_amount'),
         )
 
         rows = []
