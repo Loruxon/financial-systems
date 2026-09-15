@@ -5,7 +5,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, Count, Q
 from django.db.models.functions import Coalesce
 from auth_middleware import AccessTokenAuthentication
 from admins.permissions import IsAdmin, require_section
@@ -178,6 +178,20 @@ class AdminTransferReceiptListView(APIView):
         recipient_id = request.query_params.get('recipient_id')
         if recipient_id:
             qs = qs.filter(recipient_id=recipient_id)
+
+        # Поступление, уже привязанное к ДРУГОМУ переводу, — деньги по нему
+        # физически уже "уехали" туда, повторно предлагать его нельзя.
+        # transfer_id — id текущего перевода (страница редактирования): его
+        # собственную привязку не считаем "другим переводом", иначе список
+        # терял бы уже выбранные поступления при каждой перезагрузке.
+        transfer_id = request.query_params.get('transfer_id')
+        if transfer_id:
+            qs = qs.annotate(
+                other_transfers=Count('transfers', filter=~Q(transfers__id=transfer_id), distinct=True)
+            ).filter(other_transfers=0)
+        else:
+            qs = qs.annotate(other_transfers=Count('transfers', distinct=True)).filter(other_transfers=0)
+
         qs = qs.select_related('recipient', 'payer__organization').prefetch_related('requests')
         return Response(ReceiptListSerializer(qs, many=True).data)
 

@@ -108,13 +108,14 @@ export default function AdminTransferDetailPage() {
   }
 
   useEffect(() => {
-    if (!linkReceipts || !fromId) return
+    if (!linkReceipts || !fromId || !transfer) return
     setReceiptsLoading(true)
-    api.getAdminTransferReceipts(parseInt(fromId))
+    api.getAdminTransferReceipts(parseInt(fromId), transfer.id)
       .then(setAccountReceipts)
       .catch(() => setError("Не удалось загрузить поступления"))
       .finally(() => setReceiptsLoading(false))
-  }, [linkReceipts, fromId])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkReceipts, fromId, transfer?.id])
 
   // Если плательщик ещё не выбран вручную, а среди привязанных поступлений
   // ровно один — подставляем его плательщика, чтобы не дублировать выбор.

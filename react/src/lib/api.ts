@@ -582,9 +582,11 @@ export const api = {
     request<BankTransfer[]>('/admin/transfers/'),
 
   // Подтверждённые поступления на конкретный счёт — для привязки к переводу
-  // с этого счёта (блок "Привязать поступления" в диалоге перевода).
-  getAdminTransferReceipts: (recipientId: number) =>
-    request<Receipt[]>(`/admin/transfers/receipts/?recipient_id=${recipientId}`),
+  // с этого счёта. Уже привязанные к ДРУГОМУ переводу сюда не попадают —
+  // на странице редактирования currentTransferId исключает из этого правила
+  // собственную привязку текущего перевода.
+  getAdminTransferReceipts: (recipientId: number, currentTransferId?: number) =>
+    request<Receipt[]>(`/admin/transfers/receipts/?recipient_id=${recipientId}${currentTransferId ? `&transfer_id=${currentTransferId}` : ""}`),
 
   createAdminTransfer: (data: BankTransferCreateData) =>
     request<BankTransfer>('/admin/transfers/', { method: 'POST', body: JSON.stringify(data) }),
