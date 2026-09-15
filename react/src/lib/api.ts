@@ -296,7 +296,7 @@ export type PaymentRequest = RequestListItem & {
   money_received_at: string | null
   swift_document: string | null
   paper_document: string | null
-  linked_receipt: { id: number; date: string; amount: string; net_amount: string | null } | null
+  linked_receipts: { id: number; date: string; amount: string; net_amount: string | null }[]
 }
 
 export type AdminPaymentRequest = PaymentRequest & {
@@ -336,7 +336,7 @@ export type RequestCreateData = {
   prf_amount?: string | null
   prf_date?: string | null
   prf_recipient?: string
-  receipt_id?: number | null
+  receipt_ids?: number[]
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

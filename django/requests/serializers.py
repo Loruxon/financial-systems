@@ -11,23 +11,31 @@ from statement.models import Receipt
 MONEY_RECEIVED_STATUSES = {Request.AWAITING_CLOSING_DOCS, Request.CLOSING_DOCS_REVIEW, Request.CLOSED}
 
 
-def get_org_receipt(receipt_id, org):
-    """Подтверждённое поступление организации по id, либо ValidationError."""
-    try:
-        return Receipt.objects.select_related('payer', 'recipient').get(
-            pk=receipt_id, payer__organization=org, status=Receipt.CONFIRMED,
-        )
-    except Receipt.DoesNotExist:
-        raise serializers.ValidationError({'receipt_id': 'Поступление не найдено'})
+def get_org_receipts(receipt_ids, org):
+    """Подтверждённые поступления организации по списку id, либо ValidationError
+    (в т.ч. если хоть одно не найдено/чужое/неподтверждено)."""
+    receipts = list(Receipt.objects.select_related('payer', 'recipient').filter(
+        pk__in=receipt_ids, payer__organization=org, status=Receipt.CONFIRMED,
+    ))
+    if len(receipts) != len(set(receipt_ids)):
+        raise serializers.ValidationError({'receipt_ids': 'Поступление не найдено'})
+    return receipts
 
 
-def prf_snapshot_from_receipt(receipt):
-    """Снимок «Плательщик в РФ» из поступления — организация, ИНН, дата, получатель."""
+def prf_snapshot_from_receipts(receipts):
+    """Снимок «Плательщик в РФ» из одного или нескольких поступлений — организация,
+    ИНН и получатель берутся из общего плательщика/счёта (все выбранные поступления
+    должны быть от одного плательщика на один счёт), дата — самая поздняя из них."""
+    if len({r.payer_id for r in receipts}) > 1:
+        raise serializers.ValidationError({'receipt_ids': 'Все выбранные поступления должны быть от одного плательщика'})
+    if len({r.recipient_id for r in receipts}) > 1:
+        raise serializers.ValidationError({'receipt_ids': 'Все выбранные поступления должны быть на один счёт получателя'})
+    first = receipts[0]
     return {
-        'prf_organization': receipt.payer.name if receipt.payer else '',
-        'prf_inn': receipt.payer.inn if receipt.payer else '',
-        'prf_date': receipt.date,
-        'prf_recipient': receipt.recipient.name if receipt.recipient else '',
+        'prf_organization': first.payer.name if first.payer else '',
+        'prf_inn': first.payer.inn if first.payer else '',
+        'prf_date': max(r.date for r in receipts),
+        'prf_recipient': first.recipient.name if first.recipient else '',
     }
 
 
@@ -75,21 +83,21 @@ class RequestSerializer(serializers.ModelSerializer):
     counterparty_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     bank_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     bank_account_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-    receipt_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-    linked_receipt = serializers.SerializerMethodField()
+    receipt_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
+    linked_receipts = serializers.SerializerMethodField()
     swift_document = AttachmentFileField(read_only=True)
     paper_document = AttachmentFileField(read_only=True)
 
-    def get_linked_receipt(self, obj):
-        receipt = obj.receipts.first()
-        if not receipt:
-            return None
-        return {
-            'id': receipt.id,
-            'date': receipt.date.isoformat(),
-            'amount': str(receipt.amount),
-            'net_amount': str(receipt.net_amount) if receipt.net_amount is not None else None,
-        }
+    def get_linked_receipts(self, obj):
+        return [
+            {
+                'id': r.id,
+                'date': r.date.isoformat(),
+                'amount': str(r.amount),
+                'net_amount': str(r.net_amount) if r.net_amount is not None else None,
+            }
+            for r in obj.receipts.all()
+        ]
 
     class Meta:
         model = Request
@@ -105,17 +113,18 @@ class RequestSerializer(serializers.ModelSerializer):
             'organization_calculator',
             'assigned_admin', 'work_scheme', 'admin_note',
             'edit_payment', 'edit_prf', 'edit_documents', 'edit_closing_docs',
-            'money_received', 'money_received_at', 'linked_receipt',
+            'money_received', 'money_received_at', 'linked_receipts',
         ]
 
     def update(self, instance, validated_data):
         counterparty_id = validated_data.pop('counterparty_id', None)
         bank_id = validated_data.pop('bank_id', None)
         bank_account_id = validated_data.pop('bank_account_id', None)
-        # Отличаем "поле не прислали" (ничего не трогаем) от "прислали null"
-        # (явно отвязать поступление) — обычный .pop(..., None) их не различает.
-        receipt_id_provided = 'receipt_id' in validated_data
-        receipt_id = validated_data.pop('receipt_id', None)
+        # Отличаем "поле не прислали" (ничего не трогаем) от "прислали пустой
+        # список" (явно отвязать все поступления) — обычный .pop(..., None) их
+        # не различает.
+        receipt_ids_provided = 'receipt_ids' in validated_data
+        receipt_ids = validated_data.pop('receipt_ids', None)
 
         new_status = validated_data.get('status')
         if new_status in MONEY_RECEIVED_STATUSES and not instance.money_received:
@@ -154,16 +163,16 @@ class RequestSerializer(serializers.ModelSerializer):
             instance.bank_account = bank_account.account
             instance.bank_account_currencies = bank_account.currencies
 
-        # Клиент сам выбрал поступление в блоке "Плательщик в РФ" — привязываем
-        # заявку к нему и подтягиваем снимок плательщика/получателя из него же,
+        # Клиент сам выбрал поступление(-я) в блоке "Плательщик в РФ" — привязываем
+        # заявку к ним и подтягиваем снимок плательщика/получателя из них же,
         # чтобы данные не разъезжались с тем, что реально пришло на счёт.
-        if receipt_id_provided:
-            if receipt_id is None:
+        if receipt_ids_provided:
+            if not receipt_ids:
                 instance.receipts.clear()
             else:
-                receipt = get_org_receipt(receipt_id, instance.organization)
-                instance.receipts.set([receipt])
-                validated_data.update(prf_snapshot_from_receipt(receipt))
+                receipts = get_org_receipts(receipt_ids, instance.organization)
+                instance.receipts.set(receipts)
+                validated_data.update(prf_snapshot_from_receipts(receipts))
 
         if 'execution_rate' in validated_data and validated_data['execution_rate'] is not None:
             org = instance.organization
@@ -256,7 +265,7 @@ class RequestSubmitSerializer(serializers.Serializer):
     prf_date = serializers.DateField(required=False, allow_null=True)
     prf_recipient = serializers.CharField(max_length=255, required=False, allow_blank=True)
     status = serializers.ChoiceField(choices=Request.STATUS_CHOICES, required=False, default=Request.NEW)
-    receipt_id = serializers.IntegerField(required=False, allow_null=True)
+    receipt_ids = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
 
     def create(self, validated_data):
         org = validated_data.pop('organization')
@@ -264,10 +273,10 @@ class RequestSubmitSerializer(serializers.Serializer):
         bank = Bank.objects.get(pk=validated_data.pop('bank_id'), counterparty__organization=org)
         bank_account = BankAccount.objects.get(pk=validated_data.pop('bank_account_id'), bank=bank)
 
-        receipt_id = validated_data.pop('receipt_id', None)
-        receipt = get_org_receipt(receipt_id, org) if receipt_id is not None else None
-        if receipt is not None:
-            validated_data.update(prf_snapshot_from_receipt(receipt))
+        receipt_ids = validated_data.pop('receipt_ids', None) or []
+        receipts = get_org_receipts(receipt_ids, org) if receipt_ids else []
+        if receipts:
+            validated_data.update(prf_snapshot_from_receipts(receipts))
 
         instance = Request.objects.create(
             organization=org,
@@ -282,8 +291,8 @@ class RequestSubmitSerializer(serializers.Serializer):
             bank_account_currencies=bank_account.currencies,
             **validated_data,
         )
-        if receipt is not None:
-            instance.receipts.set([receipt])
+        if receipts:
+            instance.receipts.set(receipts)
         return instance
 
 

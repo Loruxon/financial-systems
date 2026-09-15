@@ -34,6 +34,14 @@ import { AddBankDialog } from "../counterparty/add-bank-dialog"
 import { EditBankDialog } from "../counterparty/edit-bank-dialog"
 import { AddCounterpartyDialog } from "../counterparty/add-counterparty-dialog"
 
+function pluralReceipts(n: number) {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return "поступление"
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "поступления"
+  return "поступлений"
+}
+
 const requestSchema = z.object({
   invoice: z.string().min(1, "Введите инвойс"),
   amount: z.string().min(1, "Введите сумму"),
@@ -70,7 +78,7 @@ interface FormValues {
   prfAmount?: string
   prfDate?: string
   prfRecipient?: string
-  receiptId?: number | null
+  receiptIds?: number[]
 }
 
 interface EditableBlocks {
@@ -149,16 +157,17 @@ export function RequestForm({
   const [savedId, setSavedId] = useState<number | null>(requestId)
   const [savingDraft, setSavingDraft] = useState(false)
 
-  // Поступление, выбранное в блоке "Плательщик в РФ" — если выбрано, снимок
-  // плательщика/получателя/даты берётся из него на бэкенде (см. receipt_id).
-  const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(defaultValues.receiptId ?? null)
+  // Поступления, выбранные в блоке "Плательщик в РФ" (можно несколько от
+  // одного плательщика — сумма и дата снимка считаются по ним всем на
+  // бэкенде, см. receipt_ids).
+  const [selectedReceiptIds, setSelectedReceiptIds] = useState<Set<number>>(new Set(defaultValues.receiptIds ?? []))
   // Клиент пока не знает точную сумму заявки (поступление разделится на
   // несколько заявок) — разблокирует ручной ввод суммы поверх суммы поступления.
-  const [allowCustomAmount, setAllowCustomAmount] = useState(defaultValues.receiptId != null)
+  const [allowCustomAmount, setAllowCustomAmount] = useState((defaultValues.receiptIds?.length ?? 0) > 0)
   // Постоплата — рублей ещё не было, доступна только пока не выбрано
   // поступление (иначе противоречие: поступление есть, а оплаты нет).
   const [isPostpayment, setIsPostpayment] = useState(
-    defaultValues.receiptId == null && defaultValues.prfAmount === "0"
+    !defaultValues.receiptIds?.length && defaultValues.prfAmount === "0"
   )
 
   const form = useForm<RequestFormValues>({
@@ -208,39 +217,66 @@ export function RequestForm({
     ? selectedBank.accounts.find((a) => a.currencies.includes(currency))
     : undefined
 
-  const selectedReceipt = receipts.find((r) => r.id === selectedReceiptId) ?? null
-  const prfFromReceiptLocked = prfLocked || !!selectedReceipt
-  const prfAmountLocked = prfLocked || (!!selectedReceipt && !allowCustomAmount) || isPostpayment
+  const selectedReceipts = receipts.filter((r) => selectedReceiptIds.has(r.id))
+  const prfFromReceiptLocked = prfLocked || selectedReceipts.length > 0
+  const prfAmountLocked = prfLocked || (selectedReceipts.length > 0 && !allowCustomAmount) || isPostpayment
 
   // Полностью выбранные другими заявками поступления скрываем — выбирать
-  // больше нечего. Кроме уже выбранного в этой заявке — иначе пропадёт из
-  // списка сразу после выбора (у него самого remaining часто = 0).
-  const selectableReceipts = receipts.filter((r) => parseFloat(r.remaining_amount) > 0 || r.id === selectedReceiptId)
+  // больше нечего. Кроме уже выбранных в этой заявке — иначе пропадут из
+  // списка сразу после выбора (у них самих remaining часто = 0). Как только
+  // выбрано хотя бы одно — остальные предлагаем только от того же плательщика
+  // и на тот же счёт получателя (иначе снимок "Плательщик в РФ" стал бы
+  // неоднозначным — см. prf_snapshot_from_receipts на бэкенде).
+  const selectableReceipts = receipts.filter((r) => {
+    if (!(parseFloat(r.remaining_amount) > 0 || selectedReceiptIds.has(r.id))) return false
+    if (selectedReceipts.length === 0) return true
+    return r.payer === selectedReceipts[0].payer && r.recipient === selectedReceipts[0].recipient
+  })
 
-  const handleSelectReceipt = (r: Receipt) => {
-    setSelectedReceiptId(r.id)
-    setAllowCustomAmount(false)
-    setIsPostpayment(false)
-    form.setValue("prfOrg", r.payer_name ?? "", { shouldValidate: true, shouldTouch: true })
-    form.setValue("prfInn", r.payer_inn ?? "", { shouldValidate: true, shouldTouch: true })
-    form.setValue("prfDate", r.date.split("-").reverse().join("."), { shouldValidate: true, shouldTouch: true })
-    form.setValue("prfRecipient", r.recipient_name ?? "", { shouldValidate: true, shouldTouch: true })
-    // Не полная сумма поступления, а остаток — если часть уже разобрана
-    // другими заявками, дефолт не должен требовать больше, чем осталось.
-    form.setValue("prfAmount", fmtNum(r.remaining_amount), { shouldValidate: true, shouldTouch: true })
-    setReceiptOpen(false)
+  // Применяет снимок "Плательщик в РФ" (плательщик/получатель/дата) и, если
+  // сумма не введена вручную, сумму — по текущему набору выбранных поступлений.
+  const applyReceiptSelection = (ids: Set<number>, forceAmount = false) => {
+    const selected = receipts.filter((r) => ids.has(r.id))
+    if (selected.length === 0) return
+    const first = selected[0]
+    form.setValue("prfOrg", first.payer_name ?? "", { shouldValidate: true, shouldTouch: true })
+    form.setValue("prfInn", first.payer_inn ?? "", { shouldValidate: true, shouldTouch: true })
+    form.setValue("prfRecipient", first.recipient_name ?? "", { shouldValidate: true, shouldTouch: true })
+    // Самая поздняя дата среди выбранных — так же считает бэкенд.
+    const latestDate = selected.reduce((max, r) => (r.date > max ? r.date : max), first.date)
+    form.setValue("prfDate", latestDate.split("-").reverse().join("."), { shouldValidate: true, shouldTouch: true })
+    if (forceAmount || !allowCustomAmount) {
+      // Не полная сумма поступлений, а остаток — если часть уже разобрана
+      // другими заявками, дефолт не должен требовать больше, чем осталось.
+      const total = selected.reduce((sum, r) => sum + parseFloat(r.remaining_amount), 0)
+      form.setValue("prfAmount", fmtNum(total), { shouldValidate: true, shouldTouch: true })
+    }
   }
 
-  const handleClearReceipt = () => {
-    setSelectedReceiptId(null)
+  const toggleReceipt = (r: Receipt) => {
+    const wasEmpty = selectedReceiptIds.size === 0
+    const next = new Set(selectedReceiptIds)
+    if (next.has(r.id)) next.delete(r.id); else next.add(r.id)
+    setSelectedReceiptIds(next)
+    if (next.size === 0) {
+      // Последнее убрали — просто разблокируем поля, старые значения не трогаем.
+      setAllowCustomAmount(false)
+    } else {
+      if (wasEmpty) { setAllowCustomAmount(false); setIsPostpayment(false) }
+      applyReceiptSelection(next, wasEmpty)
+    }
+  }
+
+  const handleClearReceipts = () => {
+    setSelectedReceiptIds(new Set())
     setAllowCustomAmount(false)
   }
 
-  const receiptAmountExceeded = !!selectedReceipt && allowCustomAmount &&
+  const receiptsRemainingTotal = selectedReceipts.reduce((sum, r) => sum + parseFloat(r.remaining_amount), 0)
+  const receiptAmountExceeded = selectedReceipts.length > 0 && allowCustomAmount &&
     (() => {
-      const max = parseFloat(selectedReceipt.remaining_amount)
       const entered = parseFloat(toApiDecimal(form.watch("prfAmount") || "0"))
-      return !Number.isNaN(entered) && entered > max
+      return !Number.isNaN(entered) && entered > receiptsRemainingTotal
     })()
 
   const invalidOf = (fieldState: { invalid: boolean; isTouched: boolean }) =>
@@ -269,7 +305,7 @@ export function RequestForm({
     prf_amount: data.prfAmount.trim() ? toApiDecimal(data.prfAmount) : undefined,
     prf_date: data.prfDate.trim() ? toApiDate(data.prfDate) : undefined,
     prf_recipient: data.prfRecipient.trim() || undefined,
-    receipt_id: selectedReceiptId,
+    receipt_ids: [...selectedReceiptIds],
   })
 
   // Черновик может быть сохранён с частично заполненной формой — в отличие
@@ -288,7 +324,7 @@ export function RequestForm({
     ...(data.prfAmount.trim() ? { prf_amount: toApiDecimal(data.prfAmount) } : {}),
     ...(data.prfDate.trim() ? { prf_date: toApiDate(data.prfDate) } : {}),
     ...(data.prfRecipient.trim() ? { prf_recipient: data.prfRecipient.trim() } : {}),
-    receipt_id: selectedReceiptId,
+    receipt_ids: [...selectedReceiptIds],
   })
 
   const onSubmit = async (data: RequestFormValues) => {
@@ -584,10 +620,10 @@ export function RequestForm({
                       <Field>
                         <div className="flex items-center justify-between">
                           <FieldLabel>Поступление</FieldLabel>
-                          {selectedReceipt && !prfLocked && (
+                          {selectedReceipts.length > 0 && !prfLocked && (
                             <button
                               type="button"
-                              onClick={handleClearReceipt}
+                              onClick={handleClearReceipts}
                               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                             >
                               <PencilLine className="h-3 w-3" />
@@ -599,14 +635,16 @@ export function RequestForm({
                           <PopoverTrigger asChild>
                             <button type="button" disabled={prfLocked} className={triggerClass(false)}>
                               <span className="flex min-w-0 items-baseline gap-2">
-                                <span className={cn("truncate", !selectedReceipt && "text-foreground-secondary")}>
-                                  {selectedReceipt
-                                    ? `${selectedReceipt.date.split("-").reverse().join(".")} · ${fmtNum(parseFloat(selectedReceipt.amount))} ₽`
-                                    : "Заполнить вручную (без поступления)"}
+                                <span className={cn("truncate", selectedReceipts.length === 0 && "text-foreground-secondary")}>
+                                  {selectedReceipts.length === 0
+                                    ? "Заполнить вручную (без поступления)"
+                                    : selectedReceipts.length === 1
+                                      ? `${selectedReceipts[0].date.split("-").reverse().join(".")} · ${fmtNum(parseFloat(selectedReceipts[0].amount))} ₽`
+                                      : `${selectedReceipts.length} ${pluralReceipts(selectedReceipts.length)} · ${fmtNum(receiptsRemainingTotal)} ₽`}
                                 </span>
-                                {selectedReceipt && parseFloat(selectedReceipt.remaining_amount) < parseFloat(selectedReceipt.amount) && (
+                                {selectedReceipts.length === 1 && parseFloat(selectedReceipts[0].remaining_amount) < parseFloat(selectedReceipts[0].amount) && (
                                   <span className="text-xs text-amber-600 dark:text-amber-400 shrink-0">
-                                    остаток {fmtNum(parseFloat(selectedReceipt.remaining_amount))} ₽
+                                    остаток {fmtNum(parseFloat(selectedReceipts[0].remaining_amount))} ₽
                                   </span>
                                 )}
                               </span>
@@ -622,36 +660,26 @@ export function RequestForm({
                               <CommandInput placeholder="Поиск по плательщику, получателю..." />
                               <CommandList>
                                 <CommandEmpty>Не найдено</CommandEmpty>
-                                <CommandGroup>
-                                  {selectableReceipts.map((r) => {
-                                    const remaining = parseFloat(r.remaining_amount)
-                                    const partiallyUsed = remaining < parseFloat(r.amount)
-                                    return (
-                                      <CommandItem
-                                        key={r.id}
-                                        value={`${r.payer_name ?? ""} ${r.recipient_name ?? ""} ${r.date}`}
-                                        data-checked={selectedReceiptId === r.id}
-                                        onSelect={() => handleSelectReceipt(r)}
-                                      >
-                                        <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
-                                          <span className="truncate">{r.payer_name ?? "—"} → {r.recipient_name ?? "—"}</span>
-                                          <span className="text-xs text-muted-foreground">
-                                            {r.date.split("-").reverse().join(".")} · {fmtNum(parseFloat(r.amount))} ₽
-                                            {partiallyUsed && (
-                                              <span className="text-amber-600 dark:text-amber-400"> · остаток {fmtNum(remaining)} ₽</span>
-                                            )}
-                                          </span>
-                                        </div>
-                                      </CommandItem>
-                                    )
-                                  })}
+                                {selectedReceipts.length > 0 && (
+                                  <CommandGroup heading={`Выбрано · ${selectedReceipts.length}`}>
+                                    {selectedReceipts.map((r) => (
+                                      <ReceiptOption key={r.id} r={r} checked onSelect={() => toggleReceipt(r)} />
+                                    ))}
+                                  </CommandGroup>
+                                )}
+                                <CommandGroup heading={selectedReceipts.length > 0 ? "Ещё от этого плательщика" : undefined}>
+                                  {selectableReceipts.filter((r) => !selectedReceiptIds.has(r.id)).map((r) => (
+                                    <ReceiptOption key={r.id} r={r} checked={false} onSelect={() => toggleReceipt(r)} />
+                                  ))}
                                 </CommandGroup>
                               </CommandList>
                             </Command>
                           </PopoverContent>
                         </Popover>
                         <FieldDescription>
-                          Выберите поступление — плательщик, получатель и дата заполнятся автоматически
+                          {selectedReceipts.length > 1
+                            ? "Можно выбрать несколько поступлений от одного плательщика — сумма и дата посчитаются автоматически"
+                            : "Выберите поступление (можно несколько от одного плательщика) — плательщик, получатель и дата заполнятся автоматически"}
                         </FieldDescription>
                       </Field>
                     )}
@@ -710,13 +738,13 @@ export function RequestForm({
                         <Field data-invalid={invalidOf(fieldState)}>
                           <div className="flex items-center justify-between">
                             <FieldLabel htmlFor="prf-amount">Сумма, ₽</FieldLabel>
-                            {selectedReceipt && !prfLocked && (
+                            {selectedReceipts.length > 0 && !prfLocked && (
                               <button
                                 type="button"
                                 onClick={() => {
                                   const next = !allowCustomAmount
                                   setAllowCustomAmount(next)
-                                  if (!next) form.setValue("prfAmount", fmtNum(selectedReceipt.remaining_amount), { shouldValidate: true, shouldTouch: true })
+                                  if (!next) form.setValue("prfAmount", fmtNum(receiptsRemainingTotal), { shouldValidate: true, shouldTouch: true })
                                 }}
                                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                               >
@@ -724,7 +752,7 @@ export function RequestForm({
                                 {allowCustomAmount ? "Сумма поступления" : "Другая сумма"}
                               </button>
                             )}
-                            {!selectedReceipt && !prfLocked && (
+                            {selectedReceipts.length === 0 && !prfLocked && (
                               <label htmlFor="prf-postpayment" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
                                 <Checkbox
                                   id="prf-postpayment"
@@ -751,7 +779,7 @@ export function RequestForm({
                           )}
                           {receiptAmountExceeded && (
                             <p className="text-xs text-destructive">
-                              Сумма больше остатка поступления ({fmtNum(parseFloat(selectedReceipt!.remaining_amount))} ₽)
+                              Сумма больше остатка поступлени{selectedReceipts.length > 1 ? "й" : "я"} ({fmtNum(receiptsRemainingTotal)} ₽)
                             </p>
                           )}
                           {isPostpayment && (
@@ -759,7 +787,7 @@ export function RequestForm({
                               Оплата будет внесена позже
                             </FieldDescription>
                           )}
-                          {allowCustomAmount && selectedReceipt && !receiptAmountExceeded && (
+                          {allowCustomAmount && selectedReceipts.length > 0 && !receiptAmountExceeded && (
                             <FieldDescription>
                               Поступление разделится на несколько заявок
                             </FieldDescription>
@@ -982,5 +1010,27 @@ export function RequestForm({
         }}
       />
     </div>
+  )
+}
+
+function ReceiptOption({ r, checked, onSelect }: { r: Receipt; checked: boolean; onSelect: () => void }) {
+  const remaining = parseFloat(r.remaining_amount)
+  const partiallyUsed = remaining < parseFloat(r.amount)
+  return (
+    <CommandItem
+      value={`${r.payer_name ?? ""} ${r.recipient_name ?? ""} ${r.date}`}
+      data-checked={checked}
+      onSelect={onSelect}
+    >
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 py-0.5">
+        <span className="truncate">{r.payer_name ?? "—"} → {r.recipient_name ?? "—"}</span>
+        <span className="text-xs text-muted-foreground">
+          {r.date.split("-").reverse().join(".")} · {fmtNum(parseFloat(r.amount))} ₽
+          {partiallyUsed && (
+            <span className="text-amber-600 dark:text-amber-400"> · остаток {fmtNum(remaining)} ₽</span>
+          )}
+        </span>
+      </div>
+    </CommandItem>
   )
 }

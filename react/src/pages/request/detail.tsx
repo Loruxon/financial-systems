@@ -61,7 +61,7 @@ export default function RequestDetailPage() {
     prfAmount: request.prf_amount ? fmtNum(request.prf_amount) : undefined,
     prfDate: request.prf_date ? request.prf_date.split("-").reverse().join(".") : undefined,
     prfRecipient: request.prf_recipient,
-    receiptId: request.linked_receipt?.id ?? null,
+    receiptIds: request.linked_receipts.map((r) => r.id),
   }
 
   const handleConfirmReceived = async () => {
