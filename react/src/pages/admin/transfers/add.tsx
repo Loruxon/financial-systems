@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react"
-import { ArrowLeftRight, ArrowRight, Link2 } from "lucide-react"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useNavigate } from "react-router"
+import { toast } from "sonner"
+import { ArrowLeftRight, ArrowRight, Link2, MessageSquareText } from "lucide-react"
+import { PageHeader } from "@/components/page-header"
+import { BlockCard, BlockCardHeader, BlockCardContent } from "@/components/block-card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
@@ -11,23 +14,23 @@ import { AmountInput } from "@/components/amount-input"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command"
 import { PayerSelect } from "@/components/admin/payer-select"
+import { useAuth } from "@/lib/auth-context"
 import { cn, fmtNum, toApiDate, toApiDecimal } from "@/lib/utils"
-import { api, type BankTransfer, type Recipient, type AdminPayer, type Receipt } from "@/lib/api"
+import { api, type Recipient, type AdminPayer, type Receipt } from "@/lib/api"
 
 // Что реально прибавится к счёту: если net_amount ещё не посчитан — те же
 // −0.2%, что и в остальном приложении (AdminRecipientBalanceListView).
 const receiptValue = (r: Receipt) =>
   r.net_amount !== null ? parseFloat(r.net_amount) : parseFloat(r.amount) * 0.998
 
-export function AddTransferDialog({ open, recipients, balances, payers, onPayerAdded, onClose, onCreated }: {
-  open: boolean
-  recipients: Recipient[]
-  balances: { id: number; total: number }[]
-  payers: AdminPayer[]
-  onPayerAdded: (payer: AdminPayer) => void
-  onClose: () => void
-  onCreated: (t: BankTransfer) => void
-}) {
+export default function AdminTransferAddPage() {
+  const navigate = useNavigate()
+  const { adminSections } = useAuth()
+
+  const [recipients, setRecipients] = useState<Recipient[]>([])
+  const [payers, setPayers] = useState<AdminPayer[]>([])
+  const [byRecipient, setByRecipient] = useState<{ id: number; total: number }[]>([])
+
   const today = new Date().toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
   const [fromId, setFromId] = useState("")
   const [toId, setToId] = useState("")
@@ -43,12 +46,18 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
   const [receiptsLoading, setReceiptsLoading] = useState(false)
   const [selectedReceiptIds, setSelectedReceiptIds] = useState<Set<number>>(new Set())
 
-  const reset = () => {
-    setFromId(""); setToId(""); setAmount(""); setDate(today); setPayerId(null); setNote("")
-    setError(null); setLinkReceipts(false); setAccountReceipts([]); setSelectedReceiptIds(new Set())
-  }
-
-  const handleClose = () => { reset(); onClose() }
+  useEffect(() => {
+    api.getRecipients().then(setRecipients).catch(() => toast.error("Не удалось загрузить счета"))
+    api.getAdminPayers().then(setPayers).catch(() => toast.error("Не удалось загрузить плательщиков"))
+    // Отдельное право доступа — у ограниченного админа с доступом только к
+    // "Переводам" его может не быть, тогда просто не показываем баланс.
+    if (adminSections.includes("recipient_balances")) {
+      api.getRecipientBalances()
+        .then((rows) => setByRecipient(rows.map((r) => ({ id: r.id, total: parseFloat(r.total) }))))
+        .catch(() => {})
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleFromChange = (v: string) => {
     setFromId(v)
@@ -103,12 +112,12 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
 
   const fromRecipient = recipients.find((r) => String(r.id) === fromId)
   const fromBalance = fromRecipient
-    ? (balances.find((b) => b.id === fromRecipient.id)?.total ?? null)
+    ? (byRecipient.find((b) => b.id === fromRecipient.id)?.total ?? null)
     : null
 
   const toRecipient = recipients.find((r) => String(r.id) === toId)
   const toBalance = toRecipient
-    ? (balances.find((b) => b.id === toRecipient.id)?.total ?? null)
+    ? (byRecipient.find((b) => b.id === toRecipient.id)?.total ?? null)
     : null
 
   const toRecipients = recipients.filter((r) => String(r.id) !== fromId)
@@ -119,13 +128,12 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
   const restReceiptsList = accountReceipts.filter((r) => !selectedReceiptIds.has(r.id))
   const selectedTotal = selectedReceiptsList.reduce((sum, r) => sum + receiptValue(r), 0)
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+  const handleSave = async () => {
     if (!canSubmit) return
     setSaving(true)
     setError(null)
     try {
-      onCreated(await api.createAdminTransfer({
+      await api.createAdminTransfer({
         from_recipient: parseInt(fromId),
         to_recipient: parseInt(toId),
         amount: toApiDecimal(amount),
@@ -133,8 +141,9 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
         payer: payerId,
         receipts: [...selectedReceiptIds],
         note,
-      }))
-      handleClose()
+      })
+      toast.success("Перевод создан")
+      navigate("/admin/transfers")
     } catch {
       setError("Не удалось создать перевод")
     } finally {
@@ -143,89 +152,89 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ArrowLeftRight className="size-4 text-muted-foreground" />
-            Перевод между счетами
-          </DialogTitle>
-          <DialogDescription>Внутренний перевод средств</DialogDescription>
-        </DialogHeader>
+    <div className="p-10">
+      <PageHeader
+        title="Новый перевод"
+        description="Внутренний перевод средств между счетами"
+        back={{ label: "К переводам", href: "/admin/transfers" }}
+      />
 
-        <form id="add-transfer-form" onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 max-w-2xl">
+        <BlockCard>
+          <BlockCardHeader icon={<ArrowLeftRight className="size-4" />} title="Перевод" />
+          <BlockCardContent className="flex flex-col gap-4">
+            {/* Route */}
+            <div className="rounded-xl bg-muted/50 p-4">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 gap-y-1.5">
+                <FieldLabel>Откуда</FieldLabel>
+                <span aria-hidden />
+                <FieldLabel>Куда</FieldLabel>
 
-          {/* Route */}
-          <div className="rounded-xl bg-muted/50 p-4">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-3 gap-y-1.5">
-              <FieldLabel>Откуда</FieldLabel>
-              <span aria-hidden />
-              <FieldLabel>Куда</FieldLabel>
+                <Select value={fromId} onValueChange={handleFromChange}>
+                  <SelectTrigger className="h-10 w-full bg-card text-sm"><SelectValue placeholder="Счёт" /></SelectTrigger>
+                  <SelectContent>
+                    {recipients.map((r) => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 justify-self-center" />
+                <Select value={toId} onValueChange={setToId} disabled={!fromId}>
+                  <SelectTrigger className="h-10 w-full bg-card text-sm"><SelectValue placeholder="Счёт" /></SelectTrigger>
+                  <SelectContent>
+                    {toRecipients.map((r) => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
 
-              <Select value={fromId} onValueChange={handleFromChange}>
-                <SelectTrigger className="h-10 w-full bg-card text-sm"><SelectValue placeholder="Счёт" /></SelectTrigger>
-                <SelectContent>
-                  {recipients.map((r) => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 justify-self-center" />
-              <Select value={toId} onValueChange={setToId} disabled={!fromId}>
-                <SelectTrigger className="h-10 w-full bg-card text-sm"><SelectValue placeholder="Счёт" /></SelectTrigger>
-                <SelectContent>
-                  {toRecipients.map((r) => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-
-              <span className={cn(
-                "text-xs tabular-nums font-medium",
-                fromBalance === null ? "invisible" : fromBalance > 0 ? "text-success" : "text-muted-foreground"
-              )}>
-                {fromBalance !== null && fromBalance > 0 ? `${fmtNum(fromBalance)} ₽` : "—"}
-              </span>
-              <span aria-hidden />
-              <span className={cn(
-                "text-xs tabular-nums font-medium",
-                toBalance === null ? "invisible" : toBalance > 0 ? "text-success" : "text-muted-foreground"
-              )}>
-                {toBalance !== null && toBalance > 0 ? `${fmtNum(toBalance)} ₽` : "—"}
-              </span>
-            </div>
-          </div>
-
-          {/* Amount */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <FieldLabel htmlFor="transfer-amount">Сумма, ₽</FieldLabel>
-              {fromBalance !== null && fromBalance > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  Доступно: {fmtNum(fromBalance)} ₽
+                <span className={cn(
+                  "text-xs tabular-nums font-medium",
+                  fromBalance === null ? "invisible" : fromBalance > 0 ? "text-success" : "text-muted-foreground"
+                )}>
+                  {fromBalance !== null && fromBalance > 0 ? `${fmtNum(fromBalance)} ₽` : "—"}
                 </span>
-              )}
+                <span aria-hidden />
+                <span className={cn(
+                  "text-xs tabular-nums font-medium",
+                  toBalance === null ? "invisible" : toBalance > 0 ? "text-success" : "text-muted-foreground"
+                )}>
+                  {toBalance !== null && toBalance > 0 ? `${fmtNum(toBalance)} ₽` : "—"}
+                </span>
+              </div>
             </div>
-            <AmountInput
-              id="transfer-amount"
-              value={amount}
-              onChange={setAmount}
-              max={fromBalance !== null && fromBalance > 0 ? fromBalance : undefined}
-            />
-          </div>
 
-          <div className="border-t border-border" />
-
-          {/* Date + Payer */}
-          <div className="grid grid-cols-2 gap-3">
+            {/* Amount */}
             <div className="flex flex-col gap-1.5">
-              <FieldLabel>Дата</FieldLabel>
-              <DatePicker value={date} onChange={setDate} />
+              <div className="flex items-center justify-between">
+                <FieldLabel htmlFor="transfer-amount">Сумма, ₽</FieldLabel>
+                {fromBalance !== null && fromBalance > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    Доступно: {fmtNum(fromBalance)} ₽
+                  </span>
+                )}
+              </div>
+              <AmountInput
+                id="transfer-amount"
+                value={amount}
+                onChange={setAmount}
+                max={fromBalance !== null && fromBalance > 0 ? fromBalance : undefined}
+              />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <FieldLabel>Плательщик</FieldLabel>
-              <PayerSelect value={payerId} onChange={setPayerId} payers={payers} onPayerAdded={onPayerAdded} />
-            </div>
-          </div>
 
-          {/* Link receipts */}
-          <div className="flex flex-col gap-2.5">
+            {/* Date + Payer */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <FieldLabel>Дата</FieldLabel>
+                <DatePicker value={date} onChange={setDate} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <FieldLabel>Плательщик</FieldLabel>
+                <PayerSelect value={payerId} onChange={setPayerId} payers={payers} onPayerAdded={(p) => setPayers((prev) => [...prev, p])} />
+              </div>
+            </div>
+          </BlockCardContent>
+        </BlockCard>
+
+        <BlockCard>
+          <BlockCardHeader icon={<Link2 className="size-4" />} title="Поступления" />
+          <BlockCardContent className="flex flex-col gap-3">
             <label className="flex items-center justify-between text-sm cursor-pointer select-none">
               <span className="flex items-center gap-2">
                 <Checkbox
@@ -233,8 +242,7 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
                   onCheckedChange={handleLinkReceiptsChange}
                   disabled={!fromId}
                 />
-                <Link2 className="size-3.5 text-muted-foreground" />
-                Привязать поступления
+                Привязать поступления к переводу
               </span>
               {selectedReceiptsList.length > 0 && (
                 <span className="tabular-nums text-xs text-muted-foreground">
@@ -242,6 +250,9 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
                 </span>
               )}
             </label>
+            {!fromId && (
+              <p className="text-xs text-muted-foreground">Сначала выберите счёт «Откуда»</p>
+            )}
 
             {linkReceipts && (
               <div className="rounded-lg border border-border overflow-hidden">
@@ -252,7 +263,7 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
                 ) : (
                   <Command className="bg-transparent">
                     <CommandInput placeholder="Поиск по дате, плательщику, сумме..." />
-                    <CommandList className="max-h-52">
+                    <CommandList className="max-h-72">
                       <CommandEmpty>
                         {accountReceipts.length === 0
                           ? `На счёте «${fromRecipient?.name}» нет подтверждённых поступлений`
@@ -277,35 +288,32 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
                 )}
               </div>
             )}
-          </div>
+          </BlockCardContent>
+        </BlockCard>
 
-          {/* Note */}
-          <div className="flex flex-col gap-1.5">
-            <FieldLabel htmlFor="transfer-note">Примечание</FieldLabel>
+        <BlockCard>
+          <BlockCardHeader icon={<MessageSquareText className="size-4" />} title="Примечание" />
+          <BlockCardContent>
             <Textarea
-              id="transfer-note"
               placeholder="Комментарий"
-              className="min-h-12 text-sm"
+              className="min-h-16 text-sm"
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
-          </div>
+          </BlockCardContent>
+        </BlockCard>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </form>
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <DialogFooter>
-          <Button variant="ghost" size="lg" onClick={handleClose}>Отмена</Button>
-          <Button size="lg" type="submit" form="add-transfer-form" disabled={!canSubmit || saving}>
-            {saving && <Spinner className="size-4" data-icon="inline-start" />} Перевести
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <Button size="lg" className="w-full md:w-auto md:self-start" disabled={!canSubmit || saving} onClick={handleSave}>
+          {saving && <Spinner data-icon="inline-start" />}
+          Перевести
+        </Button>
+      </div>
+    </div>
   )
 }
 
-// Значение для поиска cmdk (по дате в привычном ДД.ММ.ГГГГ, плательщику или сумме).
 function ReceiptItem({ receipt, checked, onSelect }: { receipt: Receipt; checked: boolean; onSelect: () => void }) {
   const displayDate = receipt.date.split("-").reverse().join(".")
   return (

@@ -1,37 +1,22 @@
 import { useEffect, useMemo, useState } from "react"
+import { useNavigate } from "react-router"
 import { Plus } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/page-header"
 import { DataTable } from "@/components/data-table"
 import { Button } from "@/components/ui/button"
-import { api, type BankTransfer, type Recipient, type AdminPayer } from "@/lib/api"
-import { useAuth } from "@/lib/auth-context"
+import { api, type BankTransfer } from "@/lib/api"
 import { columns, type TransferRow } from "./columns"
-import { AddTransferDialog } from "./add-transfer-dialog"
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminTransfersPage() {
-  const { adminSections } = useAuth()
+  const navigate = useNavigate()
   const [transfers, setTransfers] = useState<BankTransfer[]>([])
-  const [recipients, setRecipients] = useState<Recipient[]>([])
-  const [payers, setPayers] = useState<AdminPayer[]>([])
-  const [byRecipient, setByRecipient] = useState<{ id: number; total: number }[]>([])
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set())
-  const [addOpen, setAddOpen] = useState(false)
 
   useEffect(() => {
     api.getAdminTransfers().then(setTransfers).catch(() => toast.error("Не удалось загрузить переводы"))
-    api.getRecipients().then(setRecipients).catch(() => toast.error("Не удалось загрузить счета"))
-    api.getAdminPayers().then(setPayers).catch(() => toast.error("Не удалось загрузить плательщиков"))
-    // Отдельное право доступа — у ограниченного админа с доступом только к
-    // "Переводам" его может не быть, тогда просто не показываем баланс в диалоге.
-    if (adminSections.includes("recipient_balances")) {
-      api.getRecipientBalances()
-        .then((rows) => setByRecipient(rows.map((r) => ({ id: r.id, total: parseFloat(r.total) }))))
-        .catch(() => {})
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleDelete = async (id: number) => {
@@ -62,7 +47,7 @@ export default function AdminTransfersPage() {
           title="Переводы"
           description="Внутренние переводы между банковскими счетами"
           action={
-            <Button size="lg" onClick={() => setAddOpen(true)}>
+            <Button size="lg" onClick={() => navigate("/admin/transfers/add")}>
               <Plus data-icon="inline-start" />
               Создать перевод
             </Button>
@@ -88,16 +73,6 @@ export default function AdminTransfersPage() {
           }}
         />
       </div>
-
-      <AddTransferDialog
-        open={addOpen}
-        recipients={recipients}
-        balances={byRecipient}
-        payers={payers}
-        onPayerAdded={(payer) => setPayers((prev) => [...prev, payer])}
-        onClose={() => setAddOpen(false)}
-        onCreated={(t) => setTransfers((prev) => [t, ...prev])}
-      />
     </div>
   )
 }
