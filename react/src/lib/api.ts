@@ -101,6 +101,11 @@ export type AdminPayer = Payer & {
   organization_name: string
 }
 
+export type Organization = {
+  id: number
+  name: string
+}
+
 export type RequestStatus =
   | 'draft' | 'new' | 'in_review' | 'sent_to_bank'
   | 'awaiting_closing_docs' | 'closing_docs_review' | 'closed'
@@ -471,6 +476,12 @@ export const api = {
 
   getAdminPayers: () =>
     request<AdminPayer[]>('/admin/payers/'),
+
+  createAdminPayer: (data: { name: string; inn: string; organization_id: number }) =>
+    request<AdminPayer>('/admin/payers/', { method: 'POST', body: JSON.stringify(data) }),
+
+  getAdminOrganizations: () =>
+    request<Organization[]>('/admin/organizations/'),
 
   getAdminUsers: () =>
     request<AdminUser[]>('/admin/users/'),

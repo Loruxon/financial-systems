@@ -2,12 +2,20 @@ from rest_framework import serializers
 from admins.models import AdminUser
 from requests.models import Request
 from requests.serializers import RequestSerializer, DocumentSerializer, AttachmentFileField
-from organizations.models import Payer
+from organizations.models import Organization, Payer
 from schemes.models import WorkScheme, SchemeCurrency
 
 
+class AdminOrganizationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        fields = ['id', 'name']
+
+
 class AdminPayerSerializer(serializers.ModelSerializer):
-    organization_id = serializers.IntegerField(source='organization.id', read_only=True)
+    organization_id = serializers.PrimaryKeyRelatedField(
+        source='organization', queryset=Organization.objects.all(),
+    )
     organization_name = serializers.CharField(source='organization.name', read_only=True)
 
     class Meta:

@@ -18,6 +18,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { cn, fmtNum, toApiDate } from "@/lib/utils"
 import { api, type Recipient, type AdminPayer } from "@/lib/api"
 import { columns, type ReceiptEntry } from "./columns"
+import { AddPayerDialog } from "./add-payer-dialog"
 
 // ─── Excel parsing ────────────────────────────────────────────────────────────
 
@@ -196,58 +197,85 @@ function RecipientSelect({ value, onChange, recipients, compact }: {
 
 // ─── Payer combobox ──────────────────────────────────────────────────────────
 
-function PayerSelect({ value, onChange, payers, compact }: {
+function PayerSelect({ value, onChange, payers, compact, onPayerAdded }: {
   value: number | null
   onChange: (id: number | null) => void
   payers: AdminPayer[]
   compact?: boolean
+  /** Если передан — внизу списка появляется "Добавить плательщика", а новый
+   *  плательщик сразу выбирается и поднимается выше, в общий список payers. */
+  onPayerAdded?: (payer: AdminPayer) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
   const selected = payers.find((p) => p.id === value) ?? null
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex w-full items-center justify-between rounded-lg border border-input bg-transparent transition-colors outline-none",
-            "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20",
-            "dark:bg-input/30",
-            compact ? "h-7 px-2 text-xs" : "h-10 px-3 text-sm"
-          )}
-        >
-          <span className={cn("truncate", selected ? "" : "text-foreground-secondary")}>
-            {compact
-              ? (selected?.name ?? "Выбрать…")
-              : (selected ? `${selected.name} · ИНН ${selected.inn}` : "Выберите плательщика")}
-          </span>
-          <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground ml-1" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="p-0 w-[360px]" align="start">
-        <Command>
-          <CommandInput placeholder="Поиск по названию или ИНН..." />
-          <CommandList>
-            <CommandEmpty>Не найдено</CommandEmpty>
-            <CommandGroup>
-              {payers.map((p) => (
-                <CommandItem
-                  key={p.id}
-                  value={`${p.name} ${p.inn} ${p.organization_name}`}
-                  data-checked={value === p.id}
-                  onSelect={() => { onChange(p.id); setOpen(false) }}
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "flex w-full items-center justify-between rounded-lg border border-input bg-transparent transition-colors outline-none",
+              "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20",
+              "dark:bg-input/30",
+              compact ? "h-7 px-2 text-xs" : "h-10 px-3 text-sm"
+            )}
+          >
+            <span className={cn("truncate", selected ? "" : "text-foreground-secondary")}>
+              {compact
+                ? (selected?.name ?? "Выбрать…")
+                : (selected ? `${selected.name} · ИНН ${selected.inn}` : "Выберите плательщика")}
+            </span>
+            <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground ml-1" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="p-0 w-[360px]" align="start">
+          <Command>
+            <CommandInput placeholder="Поиск по названию или ИНН..." />
+            <CommandList>
+              <CommandEmpty>Не найдено</CommandEmpty>
+              <CommandGroup>
+                {payers.map((p) => (
+                  <CommandItem
+                    key={p.id}
+                    value={`${p.name} ${p.inn} ${p.organization_name}`}
+                    data-checked={value === p.id}
+                    onSelect={() => { onChange(p.id); setOpen(false) }}
+                  >
+                    <div className="flex flex-col gap-0.5">
+                      <span>{p.name}</span>
+                      <span className="text-xs text-muted-foreground">ИНН {p.inn} · {p.organization_name}</span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+            {onPayerAdded && (
+              <div className="border-t p-1">
+                <button
+                  type="button"
+                  onClick={() => { setOpen(false); setAddOpen(true) }}
+                  className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
-                  <div className="flex flex-col gap-0.5">
-                    <span>{p.name}</span>
-                    <span className="text-xs text-muted-foreground">ИНН {p.inn} · {p.organization_name}</span>
-                  </div>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                  <Plus className="size-3.5" /> Добавить плательщика
+                </button>
+              </div>
+            )}
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {onPayerAdded && (
+        <AddPayerDialog
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          onAdd={(payer) => {
+            onPayerAdded(payer)
+            onChange(payer.id)
+          }}
+        />
+      )}
+    </>
   )
 }
 
@@ -265,12 +293,13 @@ function makeRow(): ManualRow {
   return { key: Math.random().toString(36).slice(2), date: "", amount: "", recipientId: null, payerId: null }
 }
 
-function ManualBulkDialog({ open, onClose, onAdded, recipients, payers }: {
+function ManualBulkDialog({ open, onClose, onAdded, recipients, payers, onPayerAdded }: {
   open: boolean
   onClose: () => void
   onAdded: (entries: ReceiptEntry[]) => void
   recipients: Recipient[]
   payers: AdminPayer[]
+  onPayerAdded: (payer: AdminPayer) => void
 }) {
   const [rows, setRows] = useState<ManualRow[]>(() => [makeRow()])
   const [saving, setSaving] = useState(false)
@@ -380,6 +409,7 @@ function ManualBulkDialog({ open, onClose, onAdded, recipients, payers }: {
                         value={row.payerId}
                         onChange={id => update(row.key, { payerId: id })}
                         payers={payers}
+                        onPayerAdded={onPayerAdded}
                       />
                     </div>
                   </div>
@@ -389,7 +419,7 @@ function ManualBulkDialog({ open, onClose, onAdded, recipients, payers }: {
           </div>
 
           <AddRowButton onClick={() => setRows(prev => [...prev, makeRow()])}>
-            Добавить строку
+            Добавить платёж
           </AddRowButton>
         </div>
 
@@ -409,12 +439,13 @@ function ManualBulkDialog({ open, onClose, onAdded, recipients, payers }: {
 
 type ImportStep = "upload" | "review"
 
-function ImportDialog({ open, onClose, onImported, recipients, payers }: {
+function ImportDialog({ open, onClose, onImported, recipients, payers, onPayerAdded }: {
   open: boolean
   onClose: () => void
   onImported: (entries: ReceiptEntry[]) => void
   recipients: Recipient[]
   payers: AdminPayer[]
+  onPayerAdded: (payer: AdminPayer) => void
 }) {
   const [step, setStep] = useState<ImportStep>("upload")
   const [file, setFile] = useState<File | null>(null)
@@ -682,6 +713,7 @@ function ImportDialog({ open, onClose, onImported, recipients, payers }: {
                               value={payerMap[name]}
                               onChange={(id) => setPayerMap(m => ({ ...m, [name]: id }))}
                               payers={payers}
+                              onPayerAdded={onPayerAdded}
                             />
                           </div>
                         ))}
@@ -864,12 +896,14 @@ export default function AdminIncomingPaymentsPage() {
         recipients={recipients}
         payers={payers}
         onAdded={(entries) => setEntries((prev) => [...entries, ...prev])}
+        onPayerAdded={(payer) => setPayers((prev) => [...prev, payer])}
       />
       <ImportDialog
         open={importOpen}
         onClose={() => setImportOpen(false)}
         recipients={recipients}
         payers={payers}
+        onPayerAdded={(payer) => setPayers((prev) => [...prev, payer])}
         onImported={(imported) => setEntries((prev) => [...imported, ...prev])}
       />
     </div>

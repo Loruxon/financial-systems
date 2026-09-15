@@ -12,7 +12,7 @@ from admins.models import AdminUser
 from admins.permissions import IsAdmin, require_section
 from admins.serializers import (
     AdminRequestListSerializer, AdminRequestSerializer, AdminUserSerializer, AdminPayerSerializer,
-    AdminDocumentSerializer, WorkSchemeSerializer,
+    AdminDocumentSerializer, WorkSchemeSerializer, AdminOrganizationSerializer,
 )
 from requests.models import Request, Document
 from organizations.models import Organization, Payer, Recipient
@@ -35,6 +35,23 @@ class AdminPayerListView(APIView):
     def get(self, request):
         payers = Payer.objects.select_related('organization').all()
         return Response(AdminPayerSerializer(payers, many=True).data)
+
+    def post(self, request):
+        serializer = AdminPayerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        return Response(AdminPayerSerializer(instance).data, status=status.HTTP_201_CREATED)
+
+
+class AdminOrganizationListView(APIView):
+    """Список организаций — для выбора в справочниках вроде плательщиков
+    (не завязан на конкретный раздел, как и AdminPayerListView)."""
+    authentication_classes = [AccessTokenAuthentication]
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        orgs = Organization.objects.order_by('name')
+        return Response(AdminOrganizationSerializer(orgs, many=True).data)
 
 
 class AdminUserListView(APIView):
