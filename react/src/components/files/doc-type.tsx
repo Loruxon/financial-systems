@@ -69,7 +69,16 @@ export function FileActionButton({ tooltip, className, asChild, onClick, childre
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <AttachmentAction asChild={asChild} className={className} onClick={onClick} aria-label={tooltip}>
+        {/* Без явного type кнопка внутри <form> (форма заявки на исправлении)
+            по умолчанию submit — удаление/загрузка документа сабмитило всю
+            форму и переводило заявку в "На проверке исправлений". */}
+        <AttachmentAction
+          asChild={asChild}
+          type={asChild ? undefined : "button"}
+          className={className}
+          onClick={onClick}
+          aria-label={tooltip}
+        >
           {children}
         </AttachmentAction>
       </TooltipTrigger>
