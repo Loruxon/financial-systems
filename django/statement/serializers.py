@@ -1,6 +1,14 @@
 from decimal import Decimal
+from urllib.parse import quote
 from rest_framework import serializers
-from statement.models import Receipt, BankTransfer
+from statement.models import Receipt, BankTransfer, TransferDocument
+
+
+def content_disposition(filename):
+    """attachment с именем файла — с ASCII-заменителем для старых клиентов и
+    RFC 5987 filename* для нормального отображения кириллицы/юникода."""
+    ascii_fallback = filename.encode('ascii', 'replace').decode('ascii').replace('?', '_')
+    return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quote(filename)}"
 
 
 class ReceiptBaseSerializer(serializers.ModelSerializer):
@@ -81,3 +89,31 @@ class ReceiptListSerializer(ReceiptBaseSerializer):
             'status', 'requests', 'request_invoices', 'remaining_amount',
             'confirmed_at', 'created_at',
         ]
+
+
+class TransferDocumentSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(write_only=True)
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TransferDocument
+        fields = ['id', 'file', 'url', 'original_name', 'size', 'content_type', 'uploaded_at']
+        read_only_fields = ['id', 'original_name', 'size', 'content_type', 'uploaded_at']
+
+    def get_url(self, obj):
+        if not obj.file:
+            return None
+        return obj.file.storage.url(
+            obj.file.name,
+            parameters={'ResponseContentDisposition': content_disposition(obj.original_name)},
+        )
+
+    def create(self, validated_data):
+        upload = validated_data.pop('file')
+        return TransferDocument.objects.create(
+            file=upload,
+            original_name=upload.name,
+            size=upload.size,
+            content_type=upload.content_type or '',
+            **validated_data,
+        )

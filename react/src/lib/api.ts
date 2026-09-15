@@ -43,6 +43,15 @@ export type OutgoingPaymentDocumentItem = {
   uploaded_at: string
 }
 
+export type TransferDocumentItem = {
+  id: number
+  url: string
+  original_name: string
+  size: number
+  content_type: string
+  uploaded_at: string
+}
+
 // Справочник поставщиков — для выбора в поле "Наименование поставщика".
 export type Supplier = {
   id: number
@@ -568,6 +577,15 @@ export const api = {
 
   deleteAdminTransfer: (id: number) =>
     request<void>(`/admin/transfers/${id}/`, { method: 'DELETE' }),
+
+  getAdminTransferDocuments: (id: number) =>
+    request<TransferDocumentItem[]>(`/admin/transfers/${id}/documents/`),
+
+  uploadAdminTransferDocument: (id: number, file: File) =>
+    uploadPlainFile<TransferDocumentItem>(`/admin/transfers/${id}/documents/`, file),
+
+  deleteAdminTransferDocument: (docId: number) =>
+    request<void>(`/admin/transfer-documents/${docId}/`, { method: 'DELETE' }),
 
   getSuppliers: () =>
     request<Supplier[]>('/admin/suppliers/'),

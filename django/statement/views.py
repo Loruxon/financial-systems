@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser
 from django.db import transaction
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
@@ -10,11 +11,11 @@ from auth_middleware import AccessTokenAuthentication
 from admins.permissions import IsAdmin, require_section
 from common import get_organization
 from requests.models import Request
-from statement.models import Receipt, BankTransfer
+from statement.models import Receipt, BankTransfer, TransferDocument
 from statement.serializers import (
     ReceiptSerializer, ReceiptCreateSerializer,
     ReceiptConfirmSerializer, ReceiptListSerializer,
-    BankTransferSerializer,
+    BankTransferSerializer, TransferDocumentSerializer,
 )
 
 FROZEN_STATUSES = [
@@ -158,6 +159,46 @@ class AdminTransferReceiptListView(APIView):
             qs = qs.filter(recipient_id=recipient_id)
         qs = qs.select_related('recipient', 'payer__organization').prefetch_related('requests')
         return Response(ReceiptListSerializer(qs, many=True).data)
+
+
+class AdminTransferDocumentListView(APIView):
+    authentication_classes = [AccessTokenAuthentication]
+    permission_classes = [require_section('transfers')]
+    parser_classes = [MultiPartParser]
+
+    def get_transfer(self, pk):
+        try:
+            return BankTransfer.objects.get(pk=pk)
+        except BankTransfer.DoesNotExist:
+            raise NotFound('Transfer not found')
+
+    def get(self, request, pk):
+        transfer = self.get_transfer(pk)
+        return Response(TransferDocumentSerializer(transfer.documents.all(), many=True).data)
+
+    def post(self, request, pk):
+        transfer = self.get_transfer(pk)
+        serializer = TransferDocumentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        doc = serializer.save(transfer=transfer)
+        return Response(TransferDocumentSerializer(doc).data, status=status.HTTP_201_CREATED)
+
+
+class AdminTransferDocumentDetailView(APIView):
+    authentication_classes = [AccessTokenAuthentication]
+    permission_classes = [require_section('transfers')]
+
+    def get_object(self, pk):
+        try:
+            return TransferDocument.objects.get(pk=pk)
+        except TransferDocument.DoesNotExist:
+            raise NotFound('Document not found')
+
+    def delete(self, request, pk):
+        doc = self.get_object(pk)
+        doc.file.delete(save=False)
+        doc.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class StatementListView(APIView):

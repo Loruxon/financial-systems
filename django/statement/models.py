@@ -105,3 +105,33 @@ class BankTransfer(models.Model):
         verbose_name = 'Перевод'
         verbose_name_plural = 'Переводы'
         ordering = ['-date', '-created_at']
+
+
+def transfer_document_path(instance, filename):
+    return f'transfers/{instance.transfer_id}/{filename}'
+
+
+class TransferDocument(models.Model):
+    """Плоский список документов перевода — та же модель, что и у исходящих
+    платежей (outgoing_payments.OutgoingPaymentDocument), без раздела/типа
+    и без ограничений доступа."""
+    transfer = models.ForeignKey(
+        BankTransfer,
+        on_delete=models.CASCADE,
+        related_name='documents',
+        verbose_name='Перевод',
+    )
+    file = models.FileField(upload_to=transfer_document_path, verbose_name='Файл')
+    original_name = models.CharField(max_length=255, verbose_name='Исходное имя файла')
+    size = models.PositiveIntegerField(verbose_name='Размер, байт')
+    content_type = models.CharField(max_length=100, blank=True, verbose_name='MIME-тип')
+    uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата загрузки')
+
+    def __str__(self):
+        return self.original_name
+
+    class Meta:
+        db_table = 'transfer_documents'
+        verbose_name = 'Документ перевода'
+        verbose_name_plural = 'Документы переводов'
+        ordering = ['-uploaded_at']

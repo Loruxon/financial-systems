@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
-import { ArrowLeftRight, ArrowRight, Link2, MessageSquareText } from "lucide-react"
+import { ArrowLeftRight, ArrowRight, Files, Link2, MessageSquareText } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { BlockCard, BlockCardHeader, BlockCardContent } from "@/components/block-card"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { AmountInput } from "@/components/amount-input"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command"
 import { PayerSelect } from "@/components/admin/payer-select"
+import { TransferDocuments, type TransferDocumentsHandle } from "./documents"
 import { useAuth } from "@/lib/auth-context"
 import { cn, fmtNum, toApiDate, toApiDecimal } from "@/lib/utils"
 import { api, type Recipient, type AdminPayer, type Receipt } from "@/lib/api"
@@ -26,6 +27,7 @@ const receiptValue = (r: Receipt) =>
 export default function AdminTransferAddPage() {
   const navigate = useNavigate()
   const { adminSections } = useAuth()
+  const docsRef = useRef<TransferDocumentsHandle>(null)
 
   const [recipients, setRecipients] = useState<Recipient[]>([])
   const [payers, setPayers] = useState<AdminPayer[]>([])
@@ -133,7 +135,7 @@ export default function AdminTransferAddPage() {
     setSaving(true)
     setError(null)
     try {
-      await api.createAdminTransfer({
+      const created = await api.createAdminTransfer({
         from_recipient: parseInt(fromId),
         to_recipient: parseInt(toId),
         amount: toApiDecimal(amount),
@@ -142,6 +144,7 @@ export default function AdminTransferAddPage() {
         receipts: [...selectedReceiptIds],
         note,
       })
+      await docsRef.current?.flush(created.id)
       toast.success("Перевод создан")
       navigate("/admin/transfers")
     } catch {
@@ -300,6 +303,13 @@ export default function AdminTransferAddPage() {
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
+          </BlockCardContent>
+        </BlockCard>
+
+        <BlockCard>
+          <BlockCardHeader icon={<Files className="size-4" />} title="Документы" />
+          <BlockCardContent>
+            <TransferDocuments ref={docsRef} />
           </BlockCardContent>
         </BlockCard>
 

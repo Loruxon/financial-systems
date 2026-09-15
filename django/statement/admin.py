@@ -1,5 +1,5 @@
 from django.contrib import admin
-from statement.models import Receipt, BankTransfer
+from statement.models import Receipt, BankTransfer, TransferDocument
 
 
 @admin.register(Receipt)
@@ -11,6 +11,11 @@ class ReceiptAdmin(admin.ModelAdmin):
     ordering = ['-date']
 
 
+class TransferDocumentInline(admin.TabularInline):
+    model = TransferDocument
+    extra = 0
+
+
 @admin.register(BankTransfer)
 class BankTransferAdmin(admin.ModelAdmin):
     list_display = ['date', 'from_recipient', 'to_recipient', 'amount', 'payer', 'note', 'created_at']
@@ -19,3 +24,4 @@ class BankTransferAdmin(admin.ModelAdmin):
     date_hierarchy = 'date'
     ordering = ['-date']
     filter_horizontal = ['receipts']
+    inlines = [TransferDocumentInline]
