@@ -68,7 +68,7 @@ class BankTransferSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'from_recipient', 'from_recipient_name',
             'to_recipient', 'to_recipient_name',
-            'amount', 'date',
+            'amount', 'date', 'status',
             'payer', 'payer_name', 'payer_inn',
             'receipts', 'receipt_summaries',
             'note', 'created_at',

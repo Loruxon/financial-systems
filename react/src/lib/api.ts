@@ -166,6 +166,8 @@ export type OrganizationBalance = {
   frozen: string
 }
 
+export type BankTransferStatus = 'new' | 'executed'
+
 export type BankTransfer = {
   id: number
   from_recipient: number
@@ -174,6 +176,7 @@ export type BankTransfer = {
   to_recipient_name: string
   amount: string
   date: string
+  status: BankTransferStatus
   payer: number | null
   payer_name: string | null
   payer_inn: string | null
@@ -194,6 +197,17 @@ export type BankTransferCreateData = {
   receipts?: number[]
   note?: string
 }
+
+export type BankTransferUpdateData = Partial<{
+  from_recipient: number
+  to_recipient: number
+  amount: string
+  date: string
+  status: BankTransferStatus
+  payer: number | null
+  receipts: number[]
+  note: string
+}>
 
 export type ReceiptStatus = 'new' | 'confirmed'
 
@@ -574,6 +588,12 @@ export const api = {
 
   createAdminTransfer: (data: BankTransferCreateData) =>
     request<BankTransfer>('/admin/transfers/', { method: 'POST', body: JSON.stringify(data) }),
+
+  getAdminTransfer: (id: number) =>
+    request<BankTransfer>(`/admin/transfers/${id}/`),
+
+  updateAdminTransfer: (id: number, data: BankTransferUpdateData) =>
+    request<BankTransfer>(`/admin/transfers/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
 
   deleteAdminTransfer: (id: number) =>
     request<void>(`/admin/transfers/${id}/`, { method: 'DELETE' }),

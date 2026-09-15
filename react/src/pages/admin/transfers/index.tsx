@@ -62,9 +62,11 @@ export default function AdminTransfersPage() {
           defaultColumnVisibility={{ id: false }}
           filterColumn="note"
           filterPlaceholder="Поиск по примечанию..."
+          getRowUrl={(row) => `/admin/transfers/${row.id}`}
           columnLabels={{
             id: "ID",
             date: "Дата",
+            status: "Статус",
             route: "Маршрут",
             amount: "Сумма",
             payer_name: "Плательщик",

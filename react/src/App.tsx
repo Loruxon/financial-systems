@@ -17,6 +17,7 @@ import AdminRequestDetailPage from './pages/admin/requests/detail'
 import AdminPaymentConfirmationsPage from './pages/admin/payment-confirmations'
 import AdminTransfersPage from './pages/admin/transfers'
 import AdminTransferAddPage from './pages/admin/transfers/add'
+import AdminTransferDetailPage from './pages/admin/transfers/detail'
 import AdminIncomingPaymentsPage from './pages/admin/incoming-payments'
 import AdminOrganizationBalancesPage from './pages/admin/organization-balances'
 import AdminOutgoingPaymentsPage from './pages/admin/outgoing-payments'
@@ -131,6 +132,7 @@ const App = () => (
             <Route path="admin/payment-confirmations" element={<AdminGuard section="payment_confirmations"><AdminPaymentConfirmationsPage /></AdminGuard>} />
             <Route path="admin/transfers" element={<AdminGuard section="transfers"><AdminTransfersPage /></AdminGuard>} />
             <Route path="admin/transfers/add" element={<AdminGuard section="transfers"><AdminTransferAddPage /></AdminGuard>} />
+            <Route path="admin/transfers/:id" element={<AdminGuard section="transfers"><AdminTransferDetailPage /></AdminGuard>} />
             <Route path="admin/incoming-payments" element={<AdminGuard section="incoming_payments"><AdminIncomingPaymentsPage /></AdminGuard>} />
             <Route path="admin/organization-balances" element={<AdminGuard section="organization_balances"><AdminOrganizationBalancesPage /></AdminGuard>} />
             <Route path="admin/outgoing-payments" element={<AdminGuard section="outgoing_payments"><AdminOutgoingPaymentsPage /></AdminGuard>} />

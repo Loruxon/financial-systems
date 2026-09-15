@@ -137,6 +137,27 @@ class AdminBankTransferDetailView(APIView):
     authentication_classes = [AccessTokenAuthentication]
     permission_classes = [require_section('transfers')]
 
+    def get_object(self, pk):
+        try:
+            return BankTransfer.objects.select_related(
+                'from_recipient', 'to_recipient', 'payer'
+            ).prefetch_related('receipts').get(pk=pk)
+        except BankTransfer.DoesNotExist:
+            raise NotFound('Transfer not found')
+
+    def get(self, request, pk):
+        return Response(BankTransferSerializer(self.get_object(pk)).data)
+
+    def patch(self, request, pk):
+        transfer = self.get_object(pk)
+        serializer = BankTransferSerializer(transfer, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        transfer = serializer.save()
+        transfer = BankTransfer.objects.select_related(
+            'from_recipient', 'to_recipient', 'payer'
+        ).prefetch_related('receipts').get(pk=transfer.pk)
+        return Response(BankTransferSerializer(transfer).data)
+
     def delete(self, request, pk):
         try:
             BankTransfer.objects.get(pk=pk).delete()

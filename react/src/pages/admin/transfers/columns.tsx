@@ -4,7 +4,8 @@ import { Spinner } from "@/components/ui/spinner"
 import { ActionBtn } from "@/components/ui/action-btn"
 import { EmptyCell } from "@/components/empty-cell"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import type { BankTransfer } from "@/lib/api"
+import { GenericStatusBadge, type StatusCfg } from "@/components/status-badge"
+import type { BankTransfer, BankTransferStatus } from "@/lib/api"
 import { fmtNum } from "@/lib/utils"
 import { SortHeader } from "@/components/sort-header"
 import { TruncatedText } from "@/components/truncated-text"
@@ -12,6 +13,11 @@ import { TruncatedText } from "@/components/truncated-text"
 export type TransferRow = BankTransfer & {
   onDelete?: () => void
   deleting?: boolean
+}
+
+export const transferStatusConfig: Record<BankTransferStatus, StatusCfg> = {
+  new:      { label: "Новая",     color: "bg-blue-500",    dot: "pulse", dotColor: "bg-blue-500",                            className: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
+  executed: { label: "Исполнено", color: "bg-emerald-500", dot: "check", dotColor: "text-emerald-600 dark:text-emerald-400", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
 }
 
 export const columns: ColumnDef<TransferRow>[] = [
@@ -25,6 +31,15 @@ export const columns: ColumnDef<TransferRow>[] = [
       </span>
     ),
     sortingFn: "basic",
+  },
+  {
+    accessorKey: "status",
+    header: "Статус",
+    filterFn: (row, _columnId, filterValue: string[]) => {
+      if (!filterValue?.length) return true
+      return filterValue.includes(row.original.status)
+    },
+    cell: ({ row }) => <GenericStatusBadge cfg={transferStatusConfig[row.original.status]} />,
   },
   {
     id: "route",
@@ -99,18 +114,22 @@ export const columns: ColumnDef<TransferRow>[] = [
   },
   {
     id: "actions",
+    // Строка целиком кликабельна (переход в детальную), поэтому клик по
+    // кнопке удаления не должен всплывать и уводить со страницы.
     cell: ({ row }) => {
       const r = row.original
       if (r.deleting) return <div className="flex justify-center"><Spinner className="size-4 text-muted-foreground" /></div>
       if (!r.onDelete) return null
       return (
-        <ActionBtn
-          className="border-transparent bg-transparent text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 hover:border-destructive/20"
-          onClick={r.onDelete}
-          tooltip="Удалить"
-        >
-          <Trash2 className="size-3.5" />
-        </ActionBtn>
+        <div onClick={(e) => e.stopPropagation()}>
+          <ActionBtn
+            className="border-transparent bg-transparent text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 hover:border-destructive/20"
+            onClick={r.onDelete}
+            tooltip="Удалить"
+          >
+            <Trash2 className="size-3.5" />
+          </ActionBtn>
+        </div>
       )
     },
   },

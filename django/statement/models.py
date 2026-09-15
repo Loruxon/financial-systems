@@ -66,6 +66,13 @@ class Receipt(models.Model):
 
 
 class BankTransfer(models.Model):
+    NEW = 'new'
+    EXECUTED = 'executed'
+    STATUS_CHOICES = [
+        (NEW, 'Новая'),
+        (EXECUTED, 'Исполнено'),
+    ]
+
     from_recipient = models.ForeignKey(
         'organizations.Recipient',
         on_delete=models.PROTECT,
@@ -80,6 +87,7 @@ class BankTransfer(models.Model):
     )
     amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name='Сумма, ₽')
     date = models.DateField(verbose_name='Дата')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=NEW, verbose_name='Статус')
     payer = models.ForeignKey(
         Payer,
         on_delete=models.SET_NULL,

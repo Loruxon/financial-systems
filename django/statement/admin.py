@@ -18,8 +18,8 @@ class TransferDocumentInline(admin.TabularInline):
 
 @admin.register(BankTransfer)
 class BankTransferAdmin(admin.ModelAdmin):
-    list_display = ['date', 'from_recipient', 'to_recipient', 'amount', 'payer', 'note', 'created_at']
-    list_filter = ['from_recipient', 'to_recipient']
+    list_display = ['date', 'from_recipient', 'to_recipient', 'amount', 'status', 'payer', 'note', 'created_at']
+    list_filter = ['status', 'from_recipient', 'to_recipient']
     search_fields = ['from_recipient__name', 'to_recipient__name', 'payer__name', 'note']
     date_hierarchy = 'date'
     ordering = ['-date']
