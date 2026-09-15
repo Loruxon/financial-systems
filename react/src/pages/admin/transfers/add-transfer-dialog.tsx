@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ArrowLeftRight, ArrowRight } from "lucide-react"
+import { ArrowLeftRight, ArrowRight, Link2 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -9,9 +9,15 @@ import { Spinner } from "@/components/ui/spinner"
 import { FieldLabel } from "@/components/ui/field"
 import { AmountInput } from "@/components/amount-input"
 import { DatePicker } from "@/components/ui/date-picker"
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command"
 import { PayerSelect } from "@/components/admin/payer-select"
 import { cn, fmtNum, toApiDate, toApiDecimal } from "@/lib/utils"
 import { api, type BankTransfer, type Recipient, type AdminPayer, type Receipt } from "@/lib/api"
+
+// Что реально прибавится к счёту: если net_amount ещё не посчитан — те же
+// −0.2%, что и в остальном приложении (AdminRecipientBalanceListView).
+const receiptValue = (r: Receipt) =>
+  r.net_amount !== null ? parseFloat(r.net_amount) : parseFloat(r.amount) * 0.998
 
 export function AddTransferDialog({ open, recipients, balances, payers, onPayerAdded, onClose, onCreated }: {
   open: boolean
@@ -73,10 +79,24 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
     if (payerIds.size === 1) setPayerId([...payerIds][0])
   }, [selectedReceiptIds, accountReceipts, payerId])
 
+  const handleLinkReceiptsChange = (checked: boolean) => {
+    setLinkReceipts(checked)
+    // Чекбокс — это "да/нет" для всей привязки, а не просто скрытие списка:
+    // сняли галочку — привязанные поступления тоже снимаются.
+    if (!checked) setSelectedReceiptIds(new Set())
+  }
+
   const toggleReceipt = (id: number) => {
     setSelectedReceiptIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
+      // Сумма перевода = сумма выбранных поступлений (за вычетом −0.2%) —
+      // пока выбрано хоть одно; сняли последнее — сумму не трогаем, чтобы не
+      // затирать то, что уже могли ввести вручную.
+      if (next.size > 0) {
+        const total = accountReceipts.filter((r) => next.has(r.id)).reduce((sum, r) => sum + receiptValue(r), 0)
+        setAmount(fmtNum(total))
+      }
       return next
     })
   }
@@ -94,6 +114,10 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
   const toRecipients = recipients.filter((r) => String(r.id) !== fromId)
   const parsedAmount = parseFloat(toApiDecimal(amount))
   const canSubmit = fromId && toId && fromId !== toId && amount && parsedAmount > 0 && date
+
+  const selectedReceiptsList = accountReceipts.filter((r) => selectedReceiptIds.has(r.id))
+  const restReceiptsList = accountReceipts.filter((r) => !selectedReceiptIds.has(r.id))
+  const selectedTotal = selectedReceiptsList.reduce((sum, r) => sum + receiptValue(r), 0)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -202,45 +226,54 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
 
           {/* Link receipts */}
           <div className="flex flex-col gap-2.5">
-            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-              <Checkbox
-                checked={linkReceipts}
-                onCheckedChange={(v) => setLinkReceipts(!!v)}
-                disabled={!fromId}
-              />
-              Привязать поступления
+            <label className="flex items-center justify-between text-sm cursor-pointer select-none">
+              <span className="flex items-center gap-2">
+                <Checkbox
+                  checked={linkReceipts}
+                  onCheckedChange={handleLinkReceiptsChange}
+                  disabled={!fromId}
+                />
+                <Link2 className="size-3.5 text-muted-foreground" />
+                Привязать поступления
+              </span>
+              {selectedReceiptsList.length > 0 && (
+                <span className="tabular-nums text-xs text-muted-foreground">
+                  {selectedReceiptsList.length} · {fmtNum(selectedTotal)} ₽
+                </span>
+              )}
             </label>
+
             {linkReceipts && (
-              <div className="rounded-lg border border-border max-h-44 overflow-y-auto">
+              <div className="rounded-lg border border-border overflow-hidden">
                 {receiptsLoading ? (
-                  <div className="flex items-center justify-center py-6">
+                  <div className="flex items-center justify-center py-8">
                     <Spinner className="size-4 text-muted-foreground" />
                   </div>
-                ) : accountReceipts.length === 0 ? (
-                  <p className="px-3 py-3 text-xs text-muted-foreground">
-                    На счёте «{fromRecipient?.name}» нет подтверждённых поступлений
-                  </p>
                 ) : (
-                  <div className="divide-y divide-border">
-                    {accountReceipts.map((r) => (
-                      <label
-                        key={r.id}
-                        className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50 transition-colors"
-                      >
-                        <Checkbox
-                          checked={selectedReceiptIds.has(r.id)}
-                          onCheckedChange={() => toggleReceipt(r.id)}
-                        />
-                        <span className="tabular-nums text-xs text-muted-foreground whitespace-nowrap">
-                          {r.date.split("-").reverse().join(".")}
-                        </span>
-                        <span className="flex-1 truncate text-xs">{r.payer_name ?? "—"}</span>
-                        <span className="tabular-nums text-xs font-medium whitespace-nowrap">
-                          {fmtNum(parseFloat(r.amount))} ₽
-                        </span>
-                      </label>
-                    ))}
-                  </div>
+                  <Command className="bg-transparent">
+                    <CommandInput placeholder="Поиск по дате, плательщику, сумме..." />
+                    <CommandList className="max-h-52">
+                      <CommandEmpty>
+                        {accountReceipts.length === 0
+                          ? `На счёте «${fromRecipient?.name}» нет подтверждённых поступлений`
+                          : "Ничего не найдено"}
+                      </CommandEmpty>
+                      {selectedReceiptsList.length > 0 && (
+                        <CommandGroup heading={`Выбрано · ${selectedReceiptsList.length}`}>
+                          {selectedReceiptsList.map((r) => (
+                            <ReceiptItem key={r.id} receipt={r} checked onSelect={() => toggleReceipt(r.id)} />
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {restReceiptsList.length > 0 && (
+                        <CommandGroup heading="Поступления">
+                          {restReceiptsList.map((r) => (
+                            <ReceiptItem key={r.id} receipt={r} checked={false} onSelect={() => toggleReceipt(r.id)} />
+                          ))}
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
                 )}
               </div>
             )}
@@ -269,5 +302,22 @@ export function AddTransferDialog({ open, recipients, balances, payers, onPayerA
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Значение для поиска cmdk (по дате в привычном ДД.ММ.ГГГГ, плательщику или сумме).
+function ReceiptItem({ receipt, checked, onSelect }: { receipt: Receipt; checked: boolean; onSelect: () => void }) {
+  const displayDate = receipt.date.split("-").reverse().join(".")
+  return (
+    <CommandItem
+      value={`${displayDate} ${receipt.payer_name ?? ""} ${receipt.amount}`}
+      data-checked={checked}
+      onSelect={onSelect}
+      className="gap-2.5"
+    >
+      <span className="tabular-nums text-xs text-muted-foreground w-16 shrink-0">{displayDate}</span>
+      <span className="flex-1 truncate">{receipt.payer_name ?? "—"}</span>
+      <span className="tabular-nums text-xs font-medium shrink-0">{fmtNum(parseFloat(receipt.amount))} ₽</span>
+    </CommandItem>
   )
 }
