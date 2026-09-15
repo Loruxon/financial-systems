@@ -1,8 +1,9 @@
 import type { ColumnDef } from "@tanstack/react-table"
-import { ArrowRight, Trash2 } from "lucide-react"
+import { ArrowRight, Link2, Trash2 } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { ActionBtn } from "@/components/ui/action-btn"
 import { EmptyCell } from "@/components/empty-cell"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { BankTransfer } from "@/lib/api"
 import { fmtNum } from "@/lib/utils"
 import { SortHeader } from "@/components/sort-header"
@@ -52,11 +53,47 @@ export const columns: ColumnDef<TransferRow>[] = [
     sortingFn: (a, b) => parseFloat(a.original.amount) - parseFloat(b.original.amount),
   },
   {
+    accessorKey: "payer_name",
+    header: "Плательщик",
+    cell: ({ row }) => (
+      row.original.payer_name
+        ? <TruncatedText className="max-w-[160px] text-sm">{row.original.payer_name}</TruncatedText>
+        : <EmptyCell />
+    ),
+  },
+  {
+    id: "receipts",
+    header: "Поступления",
+    cell: ({ row }) => {
+      const receipts = row.original.receipt_summaries
+      if (!receipts.length) return <EmptyCell />
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground cursor-default">
+              <Link2 className="size-3 text-muted-foreground" />
+              {receipts.length}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="flex flex-col gap-0.5">
+              {receipts.map((r) => (
+                <span key={r.id} className="tabular-nums">
+                  {r.date.split("-").reverse().join(".")} · {fmtNum(parseFloat(r.amount))} ₽
+                </span>
+              ))}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )
+    },
+  },
+  {
     accessorKey: "note",
     header: "Примечание",
     cell: ({ row }) => (
       row.original.note
-        ? <span className="text-sm text-muted-foreground">{row.original.note}</span>
+        ? <TruncatedText className="max-w-[200px] text-sm text-muted-foreground">{row.original.note}</TruncatedText>
         : <EmptyCell />
     ),
   },

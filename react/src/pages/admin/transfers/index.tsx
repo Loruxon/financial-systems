@@ -4,7 +4,7 @@ import { toast } from "sonner"
 import { PageHeader } from "@/components/page-header"
 import { DataTable } from "@/components/data-table"
 import { Button } from "@/components/ui/button"
-import { api, type BankTransfer, type Recipient } from "@/lib/api"
+import { api, type BankTransfer, type Recipient, type AdminPayer } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import { columns, type TransferRow } from "./columns"
 import { AddTransferDialog } from "./add-transfer-dialog"
@@ -15,6 +15,7 @@ export default function AdminTransfersPage() {
   const { adminSections } = useAuth()
   const [transfers, setTransfers] = useState<BankTransfer[]>([])
   const [recipients, setRecipients] = useState<Recipient[]>([])
+  const [payers, setPayers] = useState<AdminPayer[]>([])
   const [byRecipient, setByRecipient] = useState<{ id: number; total: number }[]>([])
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
@@ -22,6 +23,7 @@ export default function AdminTransfersPage() {
   useEffect(() => {
     api.getAdminTransfers().then(setTransfers).catch(() => toast.error("Не удалось загрузить переводы"))
     api.getRecipients().then(setRecipients).catch(() => toast.error("Не удалось загрузить счета"))
+    api.getAdminPayers().then(setPayers).catch(() => toast.error("Не удалось загрузить плательщиков"))
     // Отдельное право доступа — у ограниченного админа с доступом только к
     // "Переводам" его может не быть, тогда просто не показываем баланс в диалоге.
     if (adminSections.includes("recipient_balances")) {
@@ -80,6 +82,8 @@ export default function AdminTransfersPage() {
             date: "Дата",
             route: "Маршрут",
             amount: "Сумма",
+            payer_name: "Плательщик",
+            receipts: "Поступления",
             note: "Примечание",
           }}
         />
@@ -89,6 +93,8 @@ export default function AdminTransfersPage() {
         open={addOpen}
         recipients={recipients}
         balances={byRecipient}
+        payers={payers}
+        onPayerAdded={(payer) => setPayers((prev) => [...prev, payer])}
         onClose={() => setAddOpen(false)}
         onCreated={(t) => setTransfers((prev) => [t, ...prev])}
       />

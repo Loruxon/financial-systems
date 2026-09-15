@@ -121,14 +121,14 @@ class AdminBankTransferListView(APIView):
     permission_classes = [require_section('transfers')]
 
     def get(self, request):
-        qs = BankTransfer.objects.select_related('from_recipient', 'to_recipient').all()
+        qs = BankTransfer.objects.select_related('from_recipient', 'to_recipient', 'payer').prefetch_related('receipts').all()
         return Response(BankTransferSerializer(qs, many=True).data)
 
     def post(self, request):
         serializer = BankTransferSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         transfer = serializer.save()
-        transfer = BankTransfer.objects.select_related('from_recipient', 'to_recipient').get(pk=transfer.pk)
+        transfer = BankTransfer.objects.select_related('from_recipient', 'to_recipient', 'payer').prefetch_related('receipts').get(pk=transfer.pk)
         return Response(BankTransferSerializer(transfer).data, status=status.HTTP_201_CREATED)
 
 
@@ -142,6 +142,22 @@ class AdminBankTransferDetailView(APIView):
         except BankTransfer.DoesNotExist:
             raise NotFound()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminTransferReceiptListView(APIView):
+    """Подтверждённые поступления на конкретный счёт — для привязки к
+    переводу с этого счёта. Отдельный эндпоинт (а не общий /admin/incoming-payments/),
+    т.к. права на "Переводы" не обязательно означают права на "Поступления"."""
+    authentication_classes = [AccessTokenAuthentication]
+    permission_classes = [require_section('transfers')]
+
+    def get(self, request):
+        qs = Receipt.objects.filter(status=Receipt.CONFIRMED)
+        recipient_id = request.query_params.get('recipient_id')
+        if recipient_id:
+            qs = qs.filter(recipient_id=recipient_id)
+        qs = qs.select_related('recipient', 'payer__organization').prefetch_related('requests')
+        return Response(ReceiptListSerializer(qs, many=True).data)
 
 
 class StatementListView(APIView):

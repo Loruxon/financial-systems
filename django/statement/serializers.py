@@ -50,15 +50,25 @@ class ReceiptConfirmSerializer(serializers.Serializer):
 class BankTransferSerializer(serializers.ModelSerializer):
     from_recipient_name = serializers.CharField(source='from_recipient.name', read_only=True)
     to_recipient_name = serializers.CharField(source='to_recipient.name', read_only=True)
+    payer_name = serializers.CharField(source='payer.name', read_only=True, default=None)
+    payer_inn = serializers.CharField(source='payer.inn', read_only=True, default=None)
+    receipts = serializers.PrimaryKeyRelatedField(many=True, queryset=Receipt.objects.all(), required=False)
+    receipt_summaries = serializers.SerializerMethodField()
 
     class Meta:
         model = BankTransfer
         fields = [
             'id', 'from_recipient', 'from_recipient_name',
             'to_recipient', 'to_recipient_name',
-            'amount', 'date', 'note', 'created_at',
+            'amount', 'date',
+            'payer', 'payer_name', 'payer_inn',
+            'receipts', 'receipt_summaries',
+            'note', 'created_at',
         ]
         read_only_fields = ['created_at']
+
+    def get_receipt_summaries(self, obj):
+        return [{'id': r.id, 'date': r.date.isoformat(), 'amount': str(r.amount)} for r in obj.receipts.all()]
 
 
 class ReceiptListSerializer(ReceiptBaseSerializer):

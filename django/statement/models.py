@@ -80,6 +80,23 @@ class BankTransfer(models.Model):
     )
     amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name='Сумма, ₽')
     date = models.DateField(verbose_name='Дата')
+    payer = models.ForeignKey(
+        Payer,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transfers',
+        verbose_name='Плательщик',
+    )
+    # Необязательная привязка к конкретным поступлениям, чьи деньги физически
+    # перемещает этот перевод — чисто информационная связь (в отличие от
+    # Request.prf_amount она никак не участвует в расчёте баланса счетов).
+    receipts = models.ManyToManyField(
+        Receipt,
+        related_name='transfers',
+        blank=True,
+        verbose_name='Поступления',
+    )
     note = models.CharField(max_length=255, blank=True, verbose_name='Примечание')
     created_at = models.DateTimeField(auto_now_add=True)
 

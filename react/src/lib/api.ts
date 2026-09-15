@@ -165,6 +165,13 @@ export type BankTransfer = {
   to_recipient_name: string
   amount: string
   date: string
+  payer: number | null
+  payer_name: string | null
+  payer_inn: string | null
+  // Необязательная привязка к поступлениям, чьи деньги физически перемещает
+  // этот перевод — чисто информационная связь, на баланс счетов не влияет.
+  receipts: number[]
+  receipt_summaries: { id: number; date: string; amount: string }[]
   note: string
   created_at: string
 }
@@ -174,6 +181,8 @@ export type BankTransferCreateData = {
   to_recipient: number
   amount: string
   date: string
+  payer?: number | null
+  receipts?: number[]
   note?: string
 }
 
@@ -548,6 +557,11 @@ export const api = {
 
   getAdminTransfers: () =>
     request<BankTransfer[]>('/admin/transfers/'),
+
+  // Подтверждённые поступления на конкретный счёт — для привязки к переводу
+  // с этого счёта (блок "Привязать поступления" в диалоге перевода).
+  getAdminTransferReceipts: (recipientId: number) =>
+    request<Receipt[]>(`/admin/transfers/receipts/?recipient_id=${recipientId}`),
 
   createAdminTransfer: (data: BankTransferCreateData) =>
     request<BankTransfer>('/admin/transfers/', { method: 'POST', body: JSON.stringify(data) }),
