@@ -89,6 +89,9 @@ class Request(models.Model):
     execution_rate_sebes = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True, verbose_name='Курс (себест.)')
     execution_costs_sebes = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, verbose_name='Затраты себестоимости')
     execution_profit_sebes = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True, verbose_name='Прибыль')
+    # Надбавка, включаемая в затраты себестоимости (множитель 1 + процент/100).
+    # null — используется дефолт (calculators.DEFAULT_SEBES_MARKUP_PERCENT, 0.2%).
+    sebes_markup_percent = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name='Надбавка себестоимости, %')
     # Заполняется только калькулятором calc_sebes_alsafi: сработал ли минимальный
     # порог комиссии в KZT вместо процента. Для остальных калькуляторов — null.
     sebes_min_fee_applied = models.BooleanField(null=True, blank=True, default=None, verbose_name='Применён минимум комиссии (Альсафи)')

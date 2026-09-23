@@ -229,9 +229,10 @@ class RequestSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({
                         'execution_rate_sebes': f'Не удалось получить курс НБ РК ({currency}) на дату исполнения'
                     })
+            markup_percent = validated_data.get('sebes_markup_percent', instance.sebes_markup_percent)
             result = sebes_calculator(
                 amount, rate_sebes, scheme_currency.percent, scheme_currency.swift,
-                prf_amount, balance, costs, currency, usd_rate, kzt_rate,
+                prf_amount, balance, costs, currency, usd_rate, kzt_rate, markup_percent,
             )
             # Пишем явно (даже None) — иначе при смене схемы с Альсафи на другую
             # здесь остался бы устаревший True/False от прошлого расчёта.

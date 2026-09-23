@@ -75,6 +75,10 @@ export default function AdminRequestDetailPage() {
   const [rateSebesHint, setRateSebesHint] = useState<{ text: string; source: "ok" | "shifted" | "error" } | null>(null)
   const [usdRate, setUsdRate] = useState("")
   const [usdRateSebes, setUsdRateSebes] = useState("")
+  // Надбавка себестоимости — по умолчанию 0.2% (сервер сам подставит, если
+  // не переопределять), можно указать вручную для конкретной заявки.
+  const [customMarkup, setCustomMarkup] = useState(false)
+  const [markupPercent, setMarkupPercent] = useState("")
 
   const [showSwiftDownload, setShowSwiftDownload] = useState(false)
   const [showPaperDownload, setShowPaperDownload] = useState(false)
@@ -186,6 +190,8 @@ export default function AdminRequestDetailPage() {
     setExecRate(r.execution_rate ? fmtNum(r.execution_rate, 4) : "")
     setExecDateSebes(r.execution_date_sebes ? r.execution_date_sebes.split("-").reverse().join(".") : "")
     setExecRateSebes(r.execution_rate_sebes ? fmtNum(r.execution_rate_sebes, 4) : "")
+    setCustomMarkup(r.sebes_markup_percent != null)
+    setMarkupPercent(r.sebes_markup_percent != null ? fmtNum(r.sebes_markup_percent, 2) : "")
   }
 
   const handleSaveNote = async () => {
@@ -357,11 +363,14 @@ export default function AdminRequestDetailPage() {
 
   const handleSaveExecutionSebes = async () => {
     if (!isCompleteDate(execDateSebes) || !execRateSebes.trim()) return
+    if (customMarkup && !markupPercent.trim()) return
     setExecSebesSaving(true)
     try {
       await api.updateAdminRequest(Number(id), {
         execution_date_sebes: toApiDate(execDateSebes),
         execution_rate_sebes: toApiDecimal(execRateSebes),
+        // null — явный сброс на дефолтную надбавку (0.2%), если галочку сняли.
+        sebes_markup_percent: customMarkup ? toApiDecimal(markupPercent) : null,
       })
       handleReload()
       toast.success("Расчёт себестоимости сохранён")
@@ -588,11 +597,32 @@ export default function AdminRequestDetailPage() {
                 <Input size="lg" placeholder="80,0000" value={execRateSebes} onChange={(e) => setExecRateSebes(e.target.value)} />
                 {rateSebesHint && <p className={hintClass(rateSebesHint.source)}>{rateSebesHint.text}</p>}
               </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                  <Checkbox
+                    checked={customMarkup}
+                    onCheckedChange={(v) => {
+                      const next = !!v
+                      setCustomMarkup(next)
+                      if (!next) setMarkupPercent("")
+                    }}
+                  />
+                  Своя надбавка себестоимости
+                </label>
+                {customMarkup && (
+                  <Input size="lg" placeholder="0,20" value={markupPercent} onChange={(e) => setMarkupPercent(e.target.value)} />
+                )}
+              </div>
             </div>
 
             {request.execution_costs_sebes && (
               <div className="md:row-start-4 rounded-xl border bg-muted/40 divide-y text-sm self-end">
                 <ResultRow label="Затраты себест." value={fmtNum(request.execution_costs_sebes)} />
+                <ResultRow
+                  label="Надбавка"
+                  value={fmtNum(request.sebes_markup_percent ?? "0.2", 2)}
+                  suffix="%"
+                />
                 <ResultRow
                   label="Прибыль"
                   value={request.execution_profit_sebes ? fmtNum(request.execution_profit_sebes) : null}
@@ -611,7 +641,7 @@ export default function AdminRequestDetailPage() {
             <Button
               size="lg"
               className="md:row-start-5 w-full self-end"
-              disabled={execSebesSaving || !execDateSebes.trim() || !execRateSebes.trim() || !schemeCurrency}
+              disabled={execSebesSaving || !execDateSebes.trim() || !execRateSebes.trim() || !schemeCurrency || (customMarkup && !markupPercent.trim())}
               onClick={handleSaveExecutionSebes}
             >
               {execSebesSaving && <Spinner data-icon="inline-start" />}

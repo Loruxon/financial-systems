@@ -284,6 +284,8 @@ export type PaymentRequest = RequestListItem & {
   execution_costs_sebes: string | null
   execution_profit_sebes: string | null
   sebes_min_fee_applied: boolean | null
+  // null — используется дефолт (0.2%, см. calculators.DEFAULT_SEBES_MARKUP_PERCENT).
+  sebes_markup_percent: string | null
   show_swift_download: boolean
   show_paper_download: boolean
   show_execution_block: boolean
@@ -410,6 +412,7 @@ type RequestUpdateData = Partial<RequestCreateData & {
   execution_rate: string
   execution_date_sebes: string
   execution_rate_sebes: string
+  sebes_markup_percent: string | null
   show_swift_download: boolean
   show_paper_download: boolean
   show_execution_block: boolean

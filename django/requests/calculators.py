@@ -1,5 +1,15 @@
 from decimal import Decimal
 
+# Надбавка себестоимости по умолчанию — множитель 1 + процент/100. Админ может
+# переопределить её на конкретной заявке (Request.sebes_markup_percent);
+# markup_percent=None здесь и ниже означает "использовать дефолт".
+DEFAULT_SEBES_MARKUP_PERCENT = Decimal('0.2')
+
+
+def sebes_markup_multiplier(markup_percent):
+    percent = markup_percent if markup_percent is not None else DEFAULT_SEBES_MARKUP_PERCENT
+    return 1 + percent / 100
+
 
 def cny_adjusted_swift(swift, rate, currency, usd_rate):
     # Для CNY SWIFT в базе задан в USD — переводим в эквивалент валюты сделки
@@ -9,21 +19,21 @@ def cny_adjusted_swift(swift, rate, currency, usd_rate):
     return swift
 
 
-def calc_sebes_mongols(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount, balance, costs, currency=None, usd_rate=None, kzt_rate=None):
+def calc_sebes_mongols(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount, balance, costs, currency=None, usd_rate=None, kzt_rate=None, markup_percent=None):
     swift = cny_adjusted_swift(swift_sebes, rate_sebes, currency, usd_rate)
     # Затраты себестоимости: (сумма + сумма × процент_схемы + SWIFT_схемы) × курс_себест.
-    # ×1.002 — надбавка 0.2%, уже учтённая в самой себестоимости (см. calc_sebes_alsafi).
-    costs_sebes = (amount + amount * percent_sebes / 100 + swift) * rate_sebes * Decimal('1.002')
-    # Прибыль: затраты_клиента − затраты_себест. (0.2% уже внутри costs_sebes).
+    # × надбавка — уже учтена в самой себестоимости (см. calc_sebes_alsafi).
+    costs_sebes = (amount + amount * percent_sebes / 100 + swift) * rate_sebes * sebes_markup_multiplier(markup_percent)
+    # Прибыль: затраты_клиента − затраты_себест. (надбавка уже внутри costs_sebes).
     profit_sebes = costs - costs_sebes if costs is not None else None
     return {'execution_costs_sebes': costs_sebes, 'execution_profit_sebes': profit_sebes}
 
 
-def calc_sebes_ermak(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount, balance, costs, currency=None, usd_rate=None, kzt_rate=None):
+def calc_sebes_ermak(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount, balance, costs, currency=None, usd_rate=None, kzt_rate=None, markup_percent=None):
     # Без спецрасчёта для CNY — SWIFT берётся из схемы как есть, курс USD не нужен.
-    # ×1.002 — надбавка 0.2%, уже учтённая в самой себестоимости (см. calc_sebes_alsafi).
-    costs_sebes = (amount + amount * percent_sebes / 100 + swift_sebes) * rate_sebes * Decimal('1.002')
-    # Прибыль: затраты_клиента − затраты_себест. (0.2% уже внутри costs_sebes).
+    # × надбавка — уже учтена в самой себестоимости (см. calc_sebes_alsafi).
+    costs_sebes = (amount + amount * percent_sebes / 100 + swift_sebes) * rate_sebes * sebes_markup_multiplier(markup_percent)
+    # Прибыль: затраты_клиента − затраты_себест. (надбавка уже внутри costs_sebes).
     profit_sebes = costs - costs_sebes if costs is not None else None
     return {'execution_costs_sebes': costs_sebes, 'execution_profit_sebes': profit_sebes}
 
@@ -34,7 +44,7 @@ def calc_sebes_ermak(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount,
 ALSAFI_MIN_FEE_KZT = {'EUR': 50000, 'CNY': 55000}
 
 
-def calc_sebes_alsafi(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount, balance, costs, currency=None, usd_rate=None, kzt_rate=None):
+def calc_sebes_alsafi(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount, balance, costs, currency=None, usd_rate=None, kzt_rate=None, markup_percent=None):
     fee = amount * percent_sebes / 100
     min_fee_kzt = ALSAFI_MIN_FEE_KZT.get(currency)
     min_fee_applied = False
@@ -43,10 +53,10 @@ def calc_sebes_alsafi(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount
         if floor > fee:
             fee = floor
             min_fee_applied = True
-    # ×1.002 — надбавка 0.2%, уже учтённая в самой себестоимости.
-    costs_sebes = (amount + fee + swift_sebes) * rate_sebes * Decimal('1.002')
-    # Прибыль: затраты_клиента − затраты_себест. (0.2% уже учтены внутри
-    # costs_sebes — отдельно вычитать их ещё раз из затрат клиента нельзя,
+    # × надбавка — уже учтена в самой себестоимости.
+    costs_sebes = (amount + fee + swift_sebes) * rate_sebes * sebes_markup_multiplier(markup_percent)
+    # Прибыль: затраты_клиента − затраты_себест. (надбавка уже учтена внутри
+    # costs_sebes — отдельно вычитать её ещё раз из затрат клиента нельзя,
     # иначе получится двойной учёт).
     profit_sebes = costs - costs_sebes if costs is not None else None
     return {
@@ -65,7 +75,7 @@ STAVROPOL_RULES = {
 }
 
 
-def calc_sebes_stavropol(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount, balance, costs, currency=None, usd_rate=None, kzt_rate=None):
+def calc_sebes_stavropol(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount, balance, costs, currency=None, usd_rate=None, kzt_rate=None, markup_percent=None):
     rule = STAVROPOL_RULES.get(currency)
     if rule:
         threshold, percent_above, swift_above, percent_below, swift_below = rule
@@ -75,9 +85,9 @@ def calc_sebes_stavropol(amount, rate_sebes, percent_sebes, swift_sebes, prf_amo
             percent, swift = percent_below, swift_below
     else:
         percent, swift = percent_sebes, swift_sebes
-    # ×1.002 — надбавка 0.2%, уже учтённая в самой себестоимости (см. calc_sebes_alsafi).
-    costs_sebes = (amount + amount * percent / 100 + swift) * rate_sebes * Decimal('1.002')
-    # Прибыль: затраты_клиента − затраты_себест. (0.2% уже внутри costs_sebes).
+    # × надбавка — уже учтена в самой себестоимости (см. calc_sebes_alsafi).
+    costs_sebes = (amount + amount * percent / 100 + swift) * rate_sebes * sebes_markup_multiplier(markup_percent)
+    # Прибыль: затраты_клиента − затраты_себест. (надбавка уже внутри costs_sebes).
     profit_sebes = costs - costs_sebes if costs is not None else None
     return {'execution_costs_sebes': costs_sebes, 'execution_profit_sebes': profit_sebes}
 
