@@ -41,11 +41,13 @@ def calc_sebes_alsafi(amount, rate_sebes, percent_sebes, swift_sebes, prf_amount
         if floor > fee:
             fee = floor
             min_fee_applied = True
-    # ×1.002 — надбавка 0.2% в самой себестоимости (для Альсафи, остальные
-    # калькуляторы её не содержат — там 0.2% учтены только в прибыли ниже).
+    # ×1.002 — надбавка 0.2% уже в самой себестоимости (для Альсафи; остальные
+    # калькуляторы её не содержат — там 0.2% вычитаются отдельно из прибыли).
     costs_sebes = (amount + fee + swift_sebes) * rate_sebes * Decimal('1.002')
-    # Прибыль: затраты_клиента − затраты_клиента × 0.2% − затраты_себест.
-    profit_sebes = costs - costs * 2 / 1000 - costs_sebes if costs is not None else None
+    # Прибыль: затраты_клиента − затраты_себест. (0.2% уже учтены внутри
+    # costs_sebes — отдельно вычитать их ещё раз из затрат клиента нельзя,
+    # иначе получится двойной учёт).
+    profit_sebes = costs - costs_sebes if costs is not None else None
     return {
         'execution_costs_sebes': costs_sebes,
         'execution_profit_sebes': profit_sebes,
